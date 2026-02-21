@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZANSIN Web Controller</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Courier New', monospace; }
+  .log-box { background: #0d1117; color: #c9d1d9; font-size: 0.75rem; }
+  .log-box .ok   { color: #3fb950; }
+  .log-box .fail { color: #f85149; }
+  .log-box .warn { color: #d29922; }
+  .log-box .note { color: #79c0ff; }
+  .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+  .badge-running  { background:#22c55e; }
+  .badge-finished { background:#6b7280; }
+  tr:hover td { background: #1f2937; }
+</style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center gap-4">
+  <span class="text-blue-400 font-bold text-lg">▶ ZANSIN Web Controller</span>
+  <span class="text-gray-500 text-sm" id="server-time"></span>
+</header>
+
+<!-- Tabs -->
+<nav class="bg-gray-800 border-b border-gray-700 px-6 flex gap-6">
+  <button class="tab-btn active py-3 text-sm font-medium" data-tab="sessions">演習管理</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="monitor">リアルタイムモニター</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="ranking">ランキング・比較</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="scenario">シナリオ編集</button>
+</nav>
+
+<!-- ================================================================ TAB 1: Sessions -->
+<div id="tab-sessions" class="tab-content p-6">
+  <!-- New session form -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-6">
+    <h2 class="text-blue-400 font-bold mb-4">+ 新規演習開始</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">学習者名</label>
+        <input id="new-name" type="text" placeholder="learnerA"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Training IP</label>
+        <input id="new-training-ip" type="text" placeholder="192.168.0.5"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Control IP</label>
+        <input id="new-control-ip" type="text" placeholder="192.168.0.6"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">シナリオ</label>
+        <select id="new-scenario"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+          <option value="0">0 – Dev (全ステップ)</option>
+          <option value="1" selected>1 – 最難度</option>
+          <option value="2">2 – 中難度</option>
+        </select>
+      </div>
+    </div>
+    <button id="btn-start" onclick="startSession()"
+      class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded transition">
+      ▶ 開始
+    </button>
+    <span id="start-msg" class="ml-3 text-sm text-gray-400"></span>
+  </div>
+
+  <!-- Session list -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+      <h2 class="font-bold text-sm">演習一覧</h2>
+      <button onclick="refreshSessions()" class="text-xs text-gray-400 hover:text-white">↻ 更新</button>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-750">
+        <tr class="text-gray-400 text-xs">
+          <th class="text-left px-5 py-2">学習者</th>
+          <th class="text-left px-5 py-2">Training IP</th>
+          <th class="text-left px-5 py-2">Scen.</th>
+          <th class="text-left px-5 py-2">ステータス</th>
+          <th class="text-left px-5 py-2">開始時刻</th>
+          <th class="text-left px-5 py-2">Tech.Pt</th>
+          <th class="text-left px-5 py-2">Ope.%</th>
+          <th class="text-left px-5 py-2">操作</th>
+        </tr>
+      </thead>
+      <tbody id="session-table-body">
+        <tr><td colspan="8" class="px-5 py-4 text-gray-500 text-center">読み込み中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================================================================ TAB 2: Monitor -->
+<div id="tab-monitor" class="tab-content p-6 hidden">
+  <div class="flex items-center gap-3 mb-4">
+    <label class="text-sm text-gray-400">セッション追加:</label>
+    <select id="monitor-select"
+      class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none focus:border-blue-400">
+    </select>
+    <button onclick="addMonitorPane()"
+      class="bg-gray-600 hover:bg-gray-500 text-sm px-4 py-1 rounded transition">
+      + 追加
+    </button>
+  </div>
+  <div id="monitor-panes" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+</div>
+
+<!-- ================================================================ TAB 3: Ranking -->
+<div id="tab-ranking" class="tab-content p-6 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-blue-400 font-bold">ランキング</h2>
+    <button onclick="refreshRanking()" class="text-xs text-gray-400 hover:text-white">↻ 更新</button>
+  </div>
+
+  <!-- Ranking table -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden mb-6">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-gray-400 text-xs bg-gray-750">
+          <th class="text-left px-5 py-2">順位</th>
+          <th class="text-left px-5 py-2">学習者</th>
+          <th class="text-left px-5 py-2">シナリオ</th>
+          <th class="text-left px-5 py-2">Technical Point</th>
+          <th class="text-left px-5 py-2">Operation Ratio</th>
+          <th class="text-left px-5 py-2">ステータス</th>
+        </tr>
+      </thead>
+      <tbody id="ranking-tbody">
+        <tr><td colspan="6" class="px-5 py-4 text-gray-500 text-center">読み込み中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Comparison table -->
+  <h2 class="text-blue-400 font-bold mb-3">比較表（詳細）</h2>
+  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-x-auto">
+    <table class="w-full text-sm" id="comparison-table">
+      <thead id="comparison-head"></thead>
+      <tbody id="comparison-tbody">
+        <tr><td class="px-5 py-4 text-gray-500 text-center">読み込み中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================================================================ TAB 4: Scenario Editor -->
+<div id="tab-scenario" class="tab-content p-6 hidden">
+  <div class="flex items-center gap-4 mb-4">
+    <h2 class="text-blue-400 font-bold">シナリオ編集</h2>
+    <select id="scen-num-select" onchange="loadScenarioEditor()"
+      class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none focus:border-blue-400">
+      <option value="0">Scenario 0 – Dev</option>
+      <option value="1" selected>Scenario 1 – 最難度</option>
+      <option value="2">Scenario 2 – 中難度</option>
+    </select>
+    <button onclick="addScenarioStep()"
+      class="bg-gray-600 hover:bg-gray-500 text-sm px-3 py-1 rounded transition">
+      + ステップ追加
+    </button>
+    <button onclick="saveScenario()"
+      class="bg-blue-600 hover:bg-blue-500 text-sm px-4 py-1 rounded transition">
+      💾 保存
+    </button>
+    <span id="scen-save-msg" class="text-sm text-gray-400"></span>
+  </div>
+
+  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-gray-400 text-xs bg-gray-750">
+          <th class="text-left px-4 py-2">Step ID</th>
+          <th class="text-left px-4 py-2">遅延 (分)</th>
+          <th class="text-left px-4 py-2">アクション</th>
+          <th class="text-left px-4 py-2">Cheat Count</th>
+          <th class="text-left px-4 py-2">削除</th>
+        </tr>
+      </thead>
+      <tbody id="scenario-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================================================================ SCRIPT -->
+<script>
+// ── Globals ──────────────────────────────────────────────────────────────────
+let allSessions = [];
+let availableActions = [];
+let scenarioData = {};
+let monitorPanes = {};      // session_id -> { es, el }
+let refreshTimer = null;
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('ja-JP', {
+      month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+  } catch { return iso; }
+}
+
+function badge(status) {
+  const cls = status === 'running' ? 'badge-running' : 'badge-finished';
+  const label = status === 'running' ? '● 実行中' : '■ 終了';
+  return `<span class="px-2 py-0.5 text-xs text-white rounded ${cls}">${label}</span>`;
+}
+
+function colorizeLog(line) {
+  if (line.includes('[*]')) return `<span class="ok">${escHtml(line)}</span>`;
+  if (line.includes('[+]')) return `<span class="note">${escHtml(line)}</span>`;
+  if (line.includes('[-]')) return `<span class="fail">${escHtml(line)}</span>`;
+  if (line.includes('[!]')) return `<span class="warn">${escHtml(line)}</span>`;
+  return escHtml(line);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Clock
+function startClock() {
+  const el = document.getElementById('server-time');
+  setInterval(() => {
+    el.textContent = new Date().toLocaleString('ja-JP');
+  }, 1000);
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.classList.add('text-gray-400');
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    btn.classList.add('active');
+    btn.classList.remove('text-gray-400');
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+
+    if (btn.dataset.tab === 'ranking') refreshRanking();
+    if (btn.dataset.tab === 'scenario') initScenarioTab();
+    if (btn.dataset.tab === 'monitor') refreshMonitorSelect();
+  });
+});
+
+// ── TAB 1: Sessions ───────────────────────────────────────────────────────────
+async function refreshSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    allSessions = await res.json();
+    renderSessionTable();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderSessionTable() {
+  const tbody = document.getElementById('session-table-body');
+  if (!allSessions.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-4 text-gray-500 text-center">演習なし</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = allSessions.map(s => {
+    const tp = s.technical_point != null ? s.technical_point + ' pt' : '—';
+    const or = s.operation_ratio != null ? s.operation_ratio + ' %' : '—';
+    const stopBtn = s.status === 'running'
+      ? `<button onclick="stopSession('${s.session_id}')"
+           class="bg-red-800 hover:bg-red-700 text-xs px-2 py-1 rounded">■ 停止</button>`
+      : '';
+    const monBtn = `<button onclick="openMonitor('${s.session_id}')"
+        class="ml-1 bg-gray-600 hover:bg-gray-500 text-xs px-2 py-1 rounded">📋 ログ</button>`;
+    return `<tr class="border-t border-gray-700 cursor-pointer">
+      <td class="px-5 py-2 font-medium">${escHtml(s.learner_name)}</td>
+      <td class="px-5 py-2 text-gray-400">${escHtml(s.training_ip)}</td>
+      <td class="px-5 py-2">${s.scenario}</td>
+      <td class="px-5 py-2">${badge(s.status)}</td>
+      <td class="px-5 py-2 text-gray-400 text-xs">${fmtTime(s.start_time)}</td>
+      <td class="px-5 py-2">${tp}</td>
+      <td class="px-5 py-2">${or}</td>
+      <td class="px-5 py-2">${stopBtn}${monBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function startSession() {
+  const name    = document.getElementById('new-name').value.trim();
+  const tIP     = document.getElementById('new-training-ip').value.trim();
+  const cIP     = document.getElementById('new-control-ip').value.trim();
+  const scen    = parseInt(document.getElementById('new-scenario').value);
+  const msg     = document.getElementById('start-msg');
+
+  if (!name || !tIP || !cIP) {
+    msg.textContent = '⚠ 全フィールドを入力してください';
+    msg.className = 'ml-3 text-sm text-yellow-400';
+    return;
+  }
+
+  msg.textContent = '起動中...';
+  msg.className = 'ml-3 text-sm text-gray-400';
+
+  try {
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ learner_name: name, training_ip: tIP, control_ip: cIP, scenario: scen }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    msg.textContent = `✔ 開始 (ID: ${data.session_id.slice(0,8)}...)`;
+    msg.className = 'ml-3 text-sm text-green-400';
+    await refreshSessions();
+  } catch (e) {
+    msg.textContent = '✖ エラー: ' + e.message;
+    msg.className = 'ml-3 text-sm text-red-400';
+  }
+}
+
+async function stopSession(sessionId) {
+  if (!confirm('このセッションを停止しますか？')) return;
+  await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+  await refreshSessions();
+}
+
+function openMonitor(sessionId) {
+  // Switch to monitor tab and add pane
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active'); b.classList.add('text-gray-400');
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+  document.querySelector('[data-tab="monitor"]').classList.add('active');
+  document.querySelector('[data-tab="monitor"]').classList.remove('text-gray-400');
+  document.getElementById('tab-monitor').classList.remove('hidden');
+  refreshMonitorSelect();
+  addMonitorPaneById(sessionId);
+}
+
+// ── TAB 2: Monitor ────────────────────────────────────────────────────────────
+function refreshMonitorSelect() {
+  const sel = document.getElementById('monitor-select');
+  sel.innerHTML = allSessions.map(s =>
+    `<option value="${s.session_id}">${escHtml(s.learner_name)} (${s.status})</option>`
+  ).join('');
+}
+
+function addMonitorPane() {
+  const sel = document.getElementById('monitor-select');
+  const sid = sel.value;
+  if (!sid) return;
+  addMonitorPaneById(sid);
+}
+
+function addMonitorPaneById(sessionId) {
+  if (monitorPanes[sessionId]) return;  // already open
+  const session = allSessions.find(s => s.session_id === sessionId);
+  const label = session ? session.learner_name : sessionId.slice(0,8);
+
+  const panes = document.getElementById('monitor-panes');
+  const div = document.createElement('div');
+  div.id = 'pane-' + sessionId;
+  div.className = 'bg-gray-800 border border-gray-700 rounded-lg flex flex-col';
+  div.innerHTML = `
+    <div class="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+      <span class="font-bold text-sm">${escHtml(label)}</span>
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-gray-400">
+          <input type="checkbox" checked class="mr-1" id="autoscroll-${sessionId}">自動スクロール
+        </label>
+        <button onclick="closeMonitorPane('${sessionId}')" class="text-gray-500 hover:text-white text-xs">✕</button>
+      </div>
+    </div>
+    <div id="logbox-${sessionId}" class="log-box p-3 h-80 overflow-y-auto whitespace-pre-wrap"></div>`;
+  panes.appendChild(div);
+
+  // Start SSE
+  const es = new EventSource(`/api/sessions/${sessionId}/logs/stream`);
+  const logbox = document.getElementById('logbox-' + sessionId);
+
+  es.onmessage = (e) => {
+    const line = document.createElement('div');
+    line.innerHTML = colorizeLog(e.data);
+    logbox.appendChild(line);
+    const autoScroll = document.getElementById('autoscroll-' + sessionId);
+    if (autoScroll && autoScroll.checked) {
+      logbox.scrollTop = logbox.scrollHeight;
+    }
+  };
+
+  es.addEventListener('end', () => {
+    const line = document.createElement('div');
+    line.innerHTML = '<span class="text-gray-500">— セッション終了 —</span>';
+    logbox.appendChild(line);
+    es.close();
+  });
+
+  es.onerror = () => es.close();
+
+  monitorPanes[sessionId] = { es };
+}
+
+function closeMonitorPane(sessionId) {
+  if (monitorPanes[sessionId]) {
+    monitorPanes[sessionId].es.close();
+    delete monitorPanes[sessionId];
+  }
+  const el = document.getElementById('pane-' + sessionId);
+  if (el) el.remove();
+}
+
+// ── TAB 3: Ranking ────────────────────────────────────────────────────────────
+async function refreshRanking() {
+  try {
+    const [rankRes, compRes] = await Promise.all([
+      fetch('/api/ranking'),
+      fetch('/api/comparison'),
+    ]);
+    const ranking = await rankRes.json();
+    const comp    = await compRes.json();
+    renderRanking(ranking);
+    renderComparison(comp.sessions);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderRanking(ranking) {
+  const tbody = document.getElementById('ranking-tbody');
+  if (!ranking.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-4 text-gray-500 text-center">データなし</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ranking.map((s, i) => {
+    const tp = s.technical_point != null ? `${s.technical_point} pt` : '—';
+    const or = s.operation_ratio != null ? `${s.operation_ratio} %` : '—';
+    const rank = i + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    return `<tr class="border-t border-gray-700">
+      <td class="px-5 py-2 text-center text-lg">${medal}</td>
+      <td class="px-5 py-2 font-medium">${escHtml(s.learner_name)}</td>
+      <td class="px-5 py-2">${s.scenario}</td>
+      <td class="px-5 py-2 text-green-400 font-bold">${tp}</td>
+      <td class="px-5 py-2 text-blue-400">${or}</td>
+      <td class="px-5 py-2">${badge(s.status)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderComparison(sessions) {
+  if (!sessions || !sessions.length) {
+    document.getElementById('comparison-head').innerHTML = '';
+    document.getElementById('comparison-tbody').innerHTML =
+      '<tr><td class="px-5 py-4 text-gray-500 text-center">データなし</td></tr>';
+    return;
+  }
+
+  const head = document.getElementById('comparison-head');
+  const tbody = document.getElementById('comparison-tbody');
+
+  const cols = sessions.map(s => `<th class="text-left px-4 py-2">${escHtml(s.learner_name)}</th>`).join('');
+  head.innerHTML = `<tr class="text-gray-400 text-xs bg-gray-750">
+    <th class="text-left px-4 py-2">指標</th>${cols}
+  </tr>`;
+
+  const rows = [
+    ['Technical Point', s => s.technical_point != null ? s.technical_point + ' pt' : '—'],
+    ['Operation Ratio', s => s.operation_ratio != null ? s.operation_ratio + ' %' : '—'],
+    ['シナリオ', s => s.scenario],
+    ['ステータス', s => s.status],
+    ['開始時刻', s => fmtTime(s.start_time)],
+    ['終了時刻', s => fmtTime(s.end_time)],
+    ['チート検出回数', s => s.cheat_count],
+    ['平均 Charge/Epoch', s => s.avg_charge != null ? s.avg_charge : '—'],
+  ];
+
+  tbody.innerHTML = rows.map(([label, fn]) =>
+    `<tr class="border-t border-gray-700">
+      <td class="px-4 py-2 text-gray-400 text-xs font-medium whitespace-nowrap">${label}</td>
+      ${sessions.map(s => `<td class="px-4 py-2">${fn(s)}</td>`).join('')}
+    </tr>`
+  ).join('');
+}
+
+// ── TAB 4: Scenario Editor ────────────────────────────────────────────────────
+async function initScenarioTab() {
+  if (availableActions.length === 0) {
+    const res = await fetch('/api/scenario/actions');
+    const data = await res.json();
+    availableActions = data.actions;
+  }
+  if (Object.keys(scenarioData).length === 0) {
+    const res = await fetch('/api/scenario');
+    scenarioData = await res.json();
+  }
+  loadScenarioEditor();
+}
+
+function loadScenarioEditor() {
+  const num = document.getElementById('scen-num-select').value;
+  const steps = (scenarioData[num] || []);
+  renderScenarioTable(num, steps);
+}
+
+function renderScenarioTable(num, steps) {
+  const tbody = document.getElementById('scenario-tbody');
+  tbody.innerHTML = steps.map((step, idx) => makeStepRow(num, step, idx)).join('');
+}
+
+function makeStepRow(num, step, idx) {
+  const actionOpts = availableActions.map(a =>
+    `<option value="${a}" ${a === step.action ? 'selected' : ''}>${a}</option>`
+  ).join('');
+  return `<tr id="step-row-${idx}" class="border-t border-gray-700">
+    <td class="px-4 py-1">
+      <input type="text" value="${escHtml(step.step_id)}" data-field="step_id" data-idx="${idx}"
+        class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-24 focus:outline-none focus:border-blue-400"
+        oninput="updateStep(${idx}, 'step_id', this.value)">
+    </td>
+    <td class="px-4 py-1">
+      <input type="text" value="${escHtml(step.delay)}" data-field="delay" data-idx="${idx}"
+        class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-16 focus:outline-none focus:border-blue-400"
+        oninput="updateStep(${idx}, 'delay', this.value)">
+    </td>
+    <td class="px-4 py-1">
+      <select data-field="action" data-idx="${idx}"
+        class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-400"
+        onchange="updateStep(${idx}, 'action', this.value)">
+        ${actionOpts}
+      </select>
+    </td>
+    <td class="px-4 py-1">
+      <input type="text" value="${escHtml(step.cheat_count)}" data-field="cheat_count" data-idx="${idx}"
+        class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-16 focus:outline-none focus:border-blue-400"
+        oninput="updateStep(${idx}, 'cheat_count', this.value)">
+    </td>
+    <td class="px-4 py-1">
+      <button onclick="removeStep(${idx})"
+        class="text-red-400 hover:text-red-300 text-xs px-2 py-1">✕ 削除</button>
+    </td>
+  </tr>`;
+}
+
+function updateStep(idx, field, value) {
+  const num = document.getElementById('scen-num-select').value;
+  if (scenarioData[num] && scenarioData[num][idx]) {
+    scenarioData[num][idx][field] = value;
+  }
+}
+
+function addScenarioStep() {
+  const num = document.getElementById('scen-num-select').value;
+  if (!scenarioData[num]) scenarioData[num] = [];
+  const newStep = {
+    step_id: `${num}-999`,
+    delay: '999',
+    action: availableActions[0] || 'nmap',
+    cheat_count: '0'
+  };
+  scenarioData[num].push(newStep);
+  loadScenarioEditor();
+}
+
+function removeStep(idx) {
+  const num = document.getElementById('scen-num-select').value;
+  if (scenarioData[num]) {
+    scenarioData[num].splice(idx, 1);
+    loadScenarioEditor();
+  }
+}
+
+async function saveScenario() {
+  const num = parseInt(document.getElementById('scen-num-select').value);
+  const steps = scenarioData[String(num)] || [];
+  const msg = document.getElementById('scen-save-msg');
+  msg.textContent = '保存中...';
+  msg.className = 'text-sm text-gray-400';
+
+  try {
+    const res = await fetch('/api/scenario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario: num, steps }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    msg.textContent = '✔ 保存完了';
+    msg.className = 'text-sm text-green-400';
+    // Reload from server
+    const r2 = await fetch('/api/scenario');
+    scenarioData = await r2.json();
+  } catch (e) {
+    msg.textContent = '✖ エラー: ' + e.message;
+    msg.className = 'text-sm text-red-400';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+startClock();
+refreshSessions();
+// Poll session list every 30 s
+setInterval(refreshSessions, 30000);
+</script>
+</body>
+</html>

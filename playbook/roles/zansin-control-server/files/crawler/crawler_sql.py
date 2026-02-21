@@ -27,7 +27,8 @@ class DbControl:
         config.read(os.path.join(full_path, 'crawler_config.ini'), encoding='utf-8')
 
         try:
-            db_path = os.path.join(full_path, config['DB']['db_path'])
+            _default_dir = os.path.join(full_path, config['DB']['db_path'])
+            db_path = os.environ.get('ZANSIN_SESSION_DIR', _default_dir)
             os.makedirs(db_path, exist_ok=True)
             self.db_file = os.path.join(db_path, config['DB']['db_file'].format(utility.team_name))
             self.con_timeout = int(config['DB']['con_timeout'])

@@ -105,6 +105,25 @@ sshpass -p "$current_password" ssh -t "zansin@${control_ip}" << EOF
   source $RED_CONTROLLER_VENV_PATH/bin/activate
   pip3 install -r $RED_CONTROLLER_VENV_PATH_REQUIREMENTS_PATH
   deactivate
+  mkdir -p $RED_CONTROLLER_REMOTE_PATH/sessions
+  echo "$current_password" | sudo -S tee /etc/systemd/system/zansin-web-controller.service > /dev/null << 'SVCEOF'
+[Unit]
+Description=ZANSIN Web Controller
+After=network.target
+
+[Service]
+Type=simple
+User=zansin
+WorkingDirectory=/home/zansin/red-controller
+ExecStart=/home/zansin/red-controller/red_controller_venv/bin/uvicorn web_controller.main:app --host 0.0.0.0 --port 8888 --workers 1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+  echo "$current_password" | sudo -S systemctl daemon-reload
+  echo "$current_password" | sudo -S systemctl enable --now zansin-web-controller
 EOF
 
 deploy_status "ZANSIN services setup complete!" $GREEN
