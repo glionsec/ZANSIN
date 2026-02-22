@@ -37,11 +37,7 @@ _ensure_apt_pkg() {
 check_deps() {
     _ensure_apt_pkg python3-venv   # venv 作成に必須（Ubuntu 22.04 は未搭載）
     _ensure_apt_pkg lsof           # ポート競合検出に必須（Ubuntu 22.04 は未搭載）
-    # ansible は setup_runner 機能のみ利用。未インストールでも web server は起動するため警告のみ
-    if ! command -v ansible-playbook &>/dev/null; then
-        echo "[ZANSIN] WARNING: 'ansible-playbook' not found. Setup Runner feature will be unavailable."
-        echo "[ZANSIN]          To enable it: sudo apt-get install -y ansible"
-    fi
+    _ensure_apt_pkg ansible        # Setup Runner 機能に必須
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
