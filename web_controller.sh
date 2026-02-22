@@ -15,6 +15,35 @@ _VENV_DIR="$SCRIPT_DIR/.web_venv"
 _UVICORN="$_VENV_DIR/bin/uvicorn"
 _WORKDIR="$_WEB_FILES_DIR"
 
+# ── System dependency checks ──────────────────────────────────────────────────
+
+# 指定 apt パッケージが未インストールなら自動インストールを試みる
+_ensure_apt_pkg() {
+    local pkg="$1"
+    if dpkg -s "$pkg" &>/dev/null; then
+        return 0
+    fi
+    echo "[ZANSIN] Required package '$pkg' is not installed. Attempting to install..."
+    if sudo apt-get install -y "$pkg" 2>/dev/null; then
+        echo "[ZANSIN] '$pkg' installed successfully."
+    else
+        echo "[ZANSIN] ERROR: Failed to install '$pkg'."
+        echo "[ZANSIN] Please run manually: sudo apt-get install -y $pkg"
+        exit 1
+    fi
+}
+
+# start 前に必要なシステムパッケージを確認・インストール
+check_deps() {
+    _ensure_apt_pkg python3-venv   # venv 作成に必須（Ubuntu 22.04 は未搭載）
+    _ensure_apt_pkg lsof           # ポート競合検出に必須（Ubuntu 22.04 は未搭載）
+    # ansible は setup_runner 機能のみ利用。未インストールでも web server は起動するため警告のみ
+    if ! command -v ansible-playbook &>/dev/null; then
+        echo "[ZANSIN] WARNING: 'ansible-playbook' not found. Setup Runner feature will be unavailable."
+        echo "[ZANSIN]          To enable it: sudo apt-get install -y ansible"
+    fi
+}
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 # PIDs of processes matching our uvicorn pattern
@@ -35,6 +64,8 @@ _pid_info() {
 # ── Subcommand implementations ────────────────────────────────────────────────
 
 do_start() {
+    check_deps
+
     # Pre-flight: ensure port is free before launching
     local port_pids
     port_pids=$(_port_pids)
@@ -49,10 +80,16 @@ do_start() {
 
     if [ ! -d "$_VENV_DIR" ]; then
         echo "[ZANSIN] Creating Python venv at $_VENV_DIR ..."
-        python3 -m venv "$_VENV_DIR"
+        if ! python3 -m venv "$_VENV_DIR"; then
+            echo "[ZANSIN] ERROR: Failed to create Python virtualenv at $_VENV_DIR."
+            exit 1
+        fi
     fi
     echo "[ZANSIN] Syncing Python packages ..."
-    "$_VENV_DIR/bin/pip" install -q -r "$_WEB_FILES_DIR/requirements.txt"
+    if ! "$_VENV_DIR/bin/pip" install -q -r "$_WEB_FILES_DIR/requirements.txt"; then
+        echo "[ZANSIN] ERROR: Failed to install Python packages from requirements.txt."
+        exit 1
+    fi
 
     # wireguard keys are always in the deployed /opt/zansin path, regardless of who runs this script
     export ZANSIN_WG_DIR="/opt/zansin/red-controller/wireguard"
