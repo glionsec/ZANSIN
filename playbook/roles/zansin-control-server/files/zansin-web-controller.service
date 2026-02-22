@@ -1,0 +1,15 @@
+[Unit]
+Description=ZANSIN Web Controller
+After=network.target
+
+[Service]
+Type=simple
+User=zansin
+WorkingDirectory=/opt/zansin/red-controller
+ExecStart=/opt/zansin/red-controller/red_controller_venv/bin/uvicorn web_controller.main:app --host 0.0.0.0 --port 8888 --workers 1
+Environment=ZANSIN_RC_DIR=/opt/zansin/red-controller
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

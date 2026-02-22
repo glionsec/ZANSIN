@@ -76,7 +76,7 @@ EOF
 
 # Set up Red Controller
 RED_CONTROLLER_LOCAL_PATH="./roles/zansin-control-server/files/"
-RED_CONTROLLER_REMOTE_PATH="/home/zansin/red-controller"
+RED_CONTROLLER_REMOTE_PATH="/opt/zansin/red-controller"
 RED_CONTROLLER_VENV_PATH="red_controller_venv"
 RED_CONTROLLER_VENV_PATH_REQUIREMENTS_PATH="$RED_CONTROLLER_REMOTE_PATH/requirements.txt"
 RED_CONTROLLER_ATTACK_CPANFILE_PATH="$RED_CONTROLLER_REMOTE_PATH/attack/cpanfile"
@@ -84,7 +84,7 @@ RED_CONTROLLER_ATTACK_C2S_PATH="$RED_CONTROLLER_REMOTE_PATH/attack/tools/c2s/sta
 
 # Ensure the remote directory exists
 sshpass -p "$current_password" ssh -o StrictHostKeyChecking=no "zansin@${control_ip}" \
-  "echo '$current_password' | sudo -S bash -c 'mkdir -p $RED_CONTROLLER_REMOTE_PATH && chown -R zansin:zansin /home/zansin'"
+  "echo '$current_password' | sudo -S bash -c 'mkdir -p $RED_CONTROLLER_REMOTE_PATH && chown -R zansin:zansin /opt/zansin'"
 
 # Rsync to transfer files
 sshpass -p "$current_password" rsync -avz -e "ssh -o StrictHostKeyChecking=no" $RED_CONTROLLER_LOCAL_PATH "zansin@${control_ip}:$RED_CONTROLLER_REMOTE_PATH"
@@ -126,8 +126,9 @@ After=network.target
 [Service]
 Type=simple
 User=zansin
-WorkingDirectory=/home/zansin/red-controller
-ExecStart=/home/zansin/red-controller/red_controller_venv/bin/uvicorn web_controller.main:app --host 0.0.0.0 --port 8888 --workers 1
+WorkingDirectory=/opt/zansin/red-controller
+ExecStart=/opt/zansin/red-controller/red_controller_venv/bin/uvicorn web_controller.main:app --host 0.0.0.0 --port 8888 --workers 1
+Environment=ZANSIN_RC_DIR=/opt/zansin/red-controller
 Restart=on-failure
 RestartSec=5
 

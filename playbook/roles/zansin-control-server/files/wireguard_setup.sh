@@ -15,7 +15,7 @@ fi
 [ "$(id -u)" -eq 0 ] && SUDO="" || SUDO="sudo"
 
 WG_DIR="/etc/wireguard"
-CLIENT_DIR="/home/zansin/red-controller/wireguard/clients"
+CLIENT_DIR="/opt/zansin/red-controller/wireguard/clients"
 WG_PORT=51820
 NUM_CLIENTS=30
 
@@ -50,7 +50,7 @@ SERVER_PUB=$($SUDO cat "$WG_DIR/server_public.key")
 
 # 5. Generate client key pairs (idempotent: skip individual keys that exist)
 mkdir -p "$CLIENT_DIR"
-chmod 700 "$CLIENT_DIR"
+chmod 750 "$CLIENT_DIR"
 
 PEER_BLOCKS=""
 for i in $(seq 1 $NUM_CLIENTS); do
@@ -58,7 +58,7 @@ for i in $(seq 1 $NUM_CLIENTS); do
   PUB="$CLIENT_DIR/client${i}_public.key"
   if [ ! -f "$PRIV" ]; then
     wg genkey | tee "$PRIV" | wg pubkey > "$PUB"
-    chmod 600 "$PRIV"
+    chmod 640 "$PRIV"
   fi
   CLIENT_PUB=$(cat "$PUB")
   CLIENT_IP="10.100.0.$((i + 1))"
@@ -84,13 +84,18 @@ $SUDO chmod 600 "$WG_DIR/wg0.conf"
 echo "[*] Written $WG_DIR/wg0.conf"
 
 # 7. Save Control IP for on-demand client config generation
-WIREGUARD_DIR="/home/zansin/red-controller/wireguard"
+WIREGUARD_DIR="/opt/zansin/red-controller/wireguard"
 echo "$CONTROL_IP" > "$WIREGUARD_DIR/control_ip.txt"
 chmod 644 "$WIREGUARD_DIR/control_ip.txt"
 echo "[*] Saved Control IP to $WIREGUARD_DIR/control_ip.txt"
 
+# 7b. Copy server public key (non-sensitive) to zansin-accessible directory
+cp "$WG_DIR/server_public.key" "$WIREGUARD_DIR/server_public.key"
+chmod 644 "$WIREGUARD_DIR/server_public.key"
+echo "[*] Copied server_public.key to $WIREGUARD_DIR/"
+
 # Fix ownership
-chown -R zansin:zansin "/home/zansin/red-controller/wireguard"
+chown -R zansin:zansin "/opt/zansin/red-controller/wireguard"
 
 # 8. Allow WireGuard port in UFW if active
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then

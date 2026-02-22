@@ -1,0 +1,7 @@
+---
+- name: Restart zansin-web-controller
+  ansible.builtin.systemd:
+    name: zansin-web-controller
+    state: restarted
+    daemon_reload: yes
+  become: yes

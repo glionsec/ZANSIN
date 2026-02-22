@@ -7,6 +7,8 @@
   {
     "username": "trainee",
     "password": "sha256:f0181d5c6a9a4c193428f9d712003710:7f5e2c213944b3ae77c70245682fcc9a3ea3c538cd9d3ad762d6499730f14ac7",
-    "role": "trainee"
+    "role": "trainee",
+    "wg_peer": null,
+    "training_ip": null
   }
 ]

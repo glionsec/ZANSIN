@@ -20,7 +20,7 @@ from .models import Session, SessionStatus
 # Paths (resolved relative to this file's location inside web_controller/)
 _WEB_CONTROLLER_DIR = Path(__file__).parent
 _LOCAL_RC_DIR = _WEB_CONTROLLER_DIR.parent          # this module's sibling dir
-_HOME_RC_DIR  = Path.home() / "red-controller"      # standard deployed location
+_HOME_RC_DIR  = Path(os.environ.get("ZANSIN_RC_DIR", "/opt/zansin/red-controller"))
 
 # Prefer the co-located venv; fall back to ~/red-controller/red_controller_venv
 _LOCAL_VENV = _LOCAL_RC_DIR / "red_controller_venv" / "bin" / "python3"
@@ -37,7 +37,7 @@ else:
     _VENV_PYTHON = Path(sys.executable)
 
 RED_CONTROLLER_PATH = str(_RED_CONTROLLER_DIR / "red_controller.py")
-SESSIONS_BASE_DIR = Path.home() / "red-controller" / "sessions"
+SESSIONS_BASE_DIR = _HOME_RC_DIR / "sessions"
 VENV_PYTHON = str(_VENV_PYTHON)
 
 LOG_RING_BUFFER_SIZE = 1000

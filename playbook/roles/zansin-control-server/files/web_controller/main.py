@@ -7,6 +7,7 @@ Run with:
 """
 import asyncio
 import mimetypes
+import os
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
@@ -37,11 +38,12 @@ from . import training_checker
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _WEB_CONTROLLER_DIR = Path(__file__).parent
+_RC_DIR = Path(os.environ.get("ZANSIN_RC_DIR", "/opt/zansin/red-controller"))
 
 
 def _find_docs_dir() -> Path:
     candidates = [
-        Path.home() / "red-controller" / "documents",          # deployed
+        _RC_DIR / "documents",                                                   # deployed (/opt/zansin or env)
         _WEB_CONTROLLER_DIR.parent.parent.parent.parent.parent / "documents",  # repo root (dev)
         _WEB_CONTROLLER_DIR.parent.parent / "documents",        # fallback
     ]
@@ -53,7 +55,7 @@ def _find_docs_dir() -> Path:
 
 def _find_images_dir() -> Path:
     candidates = [
-        Path.home() / "red-controller" / "images",                              # deployed
+        _RC_DIR / "images",                                                      # deployed (/opt/zansin or env)
         _WEB_CONTROLLER_DIR.parent.parent.parent.parent.parent / "images",      # repo root (dev)
         _WEB_CONTROLLER_DIR.parent.parent / "images",                           # fallback
     ]

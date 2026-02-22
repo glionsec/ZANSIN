@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """WireGuard VPN utilities — dynamic per-learner client config generation."""
+import os
 from pathlib import Path
 from typing import Optional
 
 _NUM_CLIENTS = 30
-_WG_SERVER_DIR = Path("/etc/wireguard")
-_CLIENT_DIR = Path.home() / "red-controller" / "wireguard" / "clients"
-_CONTROL_IP_FILE = Path.home() / "red-controller" / "wireguard" / "control_ip.txt"
+_WG_DIR = Path(os.environ["ZANSIN_WG_DIR"]) if "ZANSIN_WG_DIR" in os.environ \
+    else Path(__file__).resolve().parent.parent / "wireguard"
+_CLIENT_DIR = _WG_DIR / "clients"
+_CONTROL_IP_FILE = _WG_DIR / "control_ip.txt"
 WG_PORT = 51820
 
 
 def is_configured() -> bool:
-    return (_WG_SERVER_DIR / "server_public.key").exists() and _CONTROL_IP_FILE.exists()
+    return (_WG_DIR / "server_public.key").exists() and _CONTROL_IP_FILE.exists()
 
 
 def get_server_public_key() -> str:
-    p = _WG_SERVER_DIR / "server_public.key"
+    p = _WG_DIR / "server_public.key"
     return p.read_text(encoding="utf-8").strip() if p.exists() else ""
 
 

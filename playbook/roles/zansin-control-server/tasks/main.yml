@@ -1,26 +1,197 @@
 ---
-- name: Deploy documents to red-controller
+- name: Install system packages for red-controller
+  ansible.builtin.apt:
+    name:
+      - python3.10
+      - python3.10-venv
+      - python3.10-dev
+      - python3-pip
+      - nmap
+      - nikto
+      - make
+      - build-essential
+      - carton
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Create /opt/zansin base directory
+  ansible.builtin.file:
+    path: "/opt/zansin"
+    state: directory
+    owner: zansin
+    group: zansin
+    mode: "0755"
+  become: yes
+
+- name: Create red-controller directory
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller"
+    state: directory
+    owner: zansin
+    group: zansin
+    mode: "0755"
+  become: yes
+
+- name: Deploy red-controller top-level files
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../documents/"
-    dest: "/home/zansin/red-controller/documents/"
+    src: "{{ item }}"
+    dest: "/opt/zansin/red-controller/{{ item }}"
+    owner: zansin
+    group: zansin
+    mode: "0644"
+  loop:
+    - red_controller.py
+    - config.ini
+    - requirements.txt
+  become: yes
+
+- name: Deploy red-controller source directories
+  ansible.builtin.copy:
+    src: "{{ item }}/"
+    dest: "/opt/zansin/red-controller/{{ item }}/"
     owner: zansin
     group: zansin
     mode: "0644"
     directory_mode: "0755"
+  loop:
+    - attack
+    - crawler
+    - judge
+    - web_controller
+  become: yes
+  notify: Restart zansin-web-controller
+
+- name: Make start_c2s.sh executable
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller/attack/tools/c2s/start_c2s.sh"
+    mode: "0755"
+  become: yes
+
+- name: Deploy documents to red-controller
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../documents/"
+    dest: "/opt/zansin/red-controller/documents/"
+    owner: zansin
+    group: zansin
+    mode: "0644"
+    directory_mode: "0755"
+  become: yes
 
 - name: Deploy images to red-controller
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../images/"
-    dest: "/home/zansin/red-controller/images/"
+    dest: "/opt/zansin/red-controller/images/"
     owner: zansin
     group: zansin
     mode: "0644"
     directory_mode: "0755"
+  become: yes
 
 - name: Deploy wireguard_setup.sh to red-controller
   ansible.builtin.copy:
     src: "wireguard_setup.sh"
-    dest: "/home/zansin/red-controller/wireguard_setup.sh"
+    dest: "/opt/zansin/red-controller/wireguard_setup.sh"
     owner: zansin
     group: zansin
     mode: "0755"
+
+- name: Ensure wireguard directory exists
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller/wireguard"
+    state: directory
+    owner: zansin
+    group: zansin
+    mode: "0755"
+  become: yes
+
+- name: Run wireguard_setup.sh to configure WireGuard VPN
+  ansible.builtin.command:
+    cmd: "/opt/zansin/red-controller/wireguard_setup.sh {{ inventory_hostname }}"
+    creates: "/opt/zansin/red-controller/wireguard/control_ip.txt"
+  become: yes
+
+- name: Add ubuntu user to zansin group for wireguard key read access
+  ansible.builtin.user:
+    name: ubuntu
+    groups: zansin
+    append: yes
+  become: yes
+
+- name: Fix wireguard clients directory group-read permissions
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller/wireguard/clients"
+    state: directory
+    mode: "0750"
+  become: yes
+
+- name: Fix wireguard client private key group-read permissions
+  ansible.builtin.shell:
+    cmd: "chmod 640 /opt/zansin/red-controller/wireguard/clients/client*_private.key"
+  become: yes
+
+- name: Check if WireGuard server public key exists in /etc/wireguard
+  ansible.builtin.stat:
+    path: "/etc/wireguard/server_public.key"
+  register: wg_pubkey_stat
+  become: yes
+
+- name: Copy WireGuard server public key to zansin-accessible directory
+  ansible.builtin.copy:
+    src: "/etc/wireguard/server_public.key"
+    dest: "/opt/zansin/red-controller/wireguard/server_public.key"
+    owner: zansin
+    group: zansin
+    mode: "0644"
+    remote_src: yes
+  become: yes
+  when: wg_pubkey_stat.stat.exists
+
+- name: Create sessions directory
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller/sessions"
+    state: directory
+    owner: zansin
+    group: zansin
+    mode: "0755"
+  become: yes
+
+- name: Create Python 3.10 virtualenv
+  ansible.builtin.command:
+    cmd: "python3.10 -m venv /opt/zansin/red-controller/red_controller_venv"
+    creates: "/opt/zansin/red-controller/red_controller_venv/bin/python"
+  become: yes
+  become_user: zansin
+
+- name: Install Python requirements in virtualenv
+  ansible.builtin.pip:
+    requirements: "/opt/zansin/red-controller/requirements.txt"
+    virtualenv: "/opt/zansin/red-controller/red_controller_venv"
+    virtualenv_python: python3.10
+  become: yes
+  become_user: zansin
+
+- name: Install Perl dependencies via carton
+  ansible.builtin.command:
+    cmd: "carton install --cpanfile /opt/zansin/red-controller/attack/cpanfile"
+    chdir: "/opt/zansin/red-controller/attack"
+    creates: "/opt/zansin/red-controller/attack/local"
+  become: yes
+  become_user: zansin
+
+- name: Deploy zansin-web-controller systemd service
+  ansible.builtin.copy:
+    src: "zansin-web-controller.service"
+    dest: "/etc/systemd/system/zansin-web-controller.service"
+    owner: root
+    group: root
+    mode: "0644"
+  become: yes
+
+- name: Enable and start zansin-web-controller service
+  ansible.builtin.systemd:
+    name: zansin-web-controller
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  become: yes

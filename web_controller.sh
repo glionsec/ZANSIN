@@ -54,11 +54,22 @@ do_start() {
     echo "[ZANSIN] Syncing Python packages ..."
     "$_VENV_DIR/bin/pip" install -q -r "$_WEB_FILES_DIR/requirements.txt"
 
+    # wireguard keys are always in the deployed /opt/zansin path, regardless of who runs this script
+    export ZANSIN_WG_DIR="/opt/zansin/red-controller/wireguard"
+    export ZANSIN_RC_DIR="/opt/zansin/red-controller"
+
     echo "[ZANSIN] Starting Web Controller — http://0.0.0.0:$PORT"
 
     cd "$_WORKDIR"
-    exec "$_UVICORN" web_controller.main:app \
-        --host 0.0.0.0 --port "$PORT" --workers 1
+    # sg は /etc/group を直接参照するため、usermod -aG 直後でも再ログインなしでグループが有効化される
+    if ! id -Gn | grep -qw zansin && getent group zansin 2>/dev/null | grep -qw "$(id -un)"; then
+        echo "[ZANSIN] Activating zansin group via sg (no re-login needed)..."
+        exec sg zansin -c "$(printf '%q ' "$_UVICORN" web_controller.main:app \
+            --host 0.0.0.0 --port "$PORT" --workers 1)"
+    else
+        exec "$_UVICORN" web_controller.main:app \
+            --host 0.0.0.0 --port "$PORT" --workers 1
+    fi
 }
 
 do_stop() {
