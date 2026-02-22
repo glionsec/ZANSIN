@@ -78,8 +78,9 @@ do_start() {
         exit 1
     fi
 
-    if [ ! -d "$_VENV_DIR" ]; then
+    if [ ! -x "$_VENV_DIR/bin/pip" ]; then
         echo "[ZANSIN] Creating Python venv at $_VENV_DIR ..."
+        rm -rf "$_VENV_DIR"
         if ! python3 -m venv "$_VENV_DIR"; then
             echo "[ZANSIN] ERROR: Failed to create Python virtualenv at $_VENV_DIR."
             exit 1
