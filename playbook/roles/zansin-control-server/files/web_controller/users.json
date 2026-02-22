@@ -1,0 +1,12 @@
+[
+  {
+    "username": "admin",
+    "password": "sha256:c122e7603980ee633d635a3183bd46a0:ca843ec3f49d38661ba28c03f64d5b34cbd68f5e6c6fc728279b9ae307bc30a2",
+    "role": "admin"
+  },
+  {
+    "username": "trainee",
+    "password": "sha256:f0181d5c6a9a4c193428f9d712003710:7f5e2c213944b3ae77c70245682fcc9a3ea3c538cd9d3ad762d6499730f14ac7",
+    "role": "trainee"
+  }
+]

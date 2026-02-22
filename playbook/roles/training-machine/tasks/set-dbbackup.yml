@@ -1,6 +1,6 @@
 - name: create backup directory
   become: yes
-  shell: "mkdir /usr/local/dbbackup"
+  shell: "mkdir -p /usr/local/dbbackup"
 
 - name: Copy backup.sh
   become: yes

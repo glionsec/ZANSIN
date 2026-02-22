@@ -34,13 +34,14 @@ def show_banner():
 # Define command option.
 __doc__ = """{f}
 usage:
-    {f} -n <name> -t <training-server-ip> -c <control-server-ip> -a <attack-scenario>
+    {f} -n <name> -t <training-server-ip> -c <control-server-ip> -a <attack-scenario> [-d <minutes>]
     {f} -h | --help
 options:
     -n <name>                 : Leaner name (e.g., Taro Zansin).
     -t <training-server-ip>   : ZANSIN Training Machine's IP Address (e.g., 192.168.0.5).
     -c <control-server-ip>    : ZANSIN Control Server's IP Address (e.g., 192.168.0.6).
     -a <attack-scenario>      : Attack Scenario Number (e.g., 1).
+    -d <minutes>              : Override training duration in minutes (default: config.ini value).
     -h --help Show this help message and exit.
 """.format(f=__file__)
 
@@ -129,8 +130,10 @@ if __name__ == '__main__':
         if control_server_port is None:
             raise Exception('There are no available TCP ports on this server.')
 
-        # Get training time.
-        start_time, end_time = get_training_time(int(config['Common']['training_minutes']))
+        # Get training time (allow -d flag to override config.ini value).
+        arg_minutes = args.get('-d')
+        training_minutes = int(arg_minutes) if arg_minutes else int(config['Common']['training_minutes'])
+        start_time, end_time = get_training_time(training_minutes)
 
         # Define modules and arguments for threading.
         thread_crawler = threading.Thread(target=execute_crawler, args=(arg_leaner,

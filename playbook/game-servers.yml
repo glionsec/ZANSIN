@@ -6,8 +6,8 @@
   vars:
     hostname: training-machine
     ansible_ssh_user: zansin
-    ansible_ssh_pass: Passw0rd!
-    ansible_become_password: Passw0rd!
+    ansible_ssh_pass: 1234qwer
+    ansible_become_password: 1234qwer
   roles:
     - name: training-machine
       # Add import statement for training-machine role
@@ -21,8 +21,8 @@
   vars:
     hostname: zansin-control-server
     ansible_ssh_user: zansin
-    ansible_ssh_pass: Passw0rd!
-    ansible_become_password: Passw0rd!
+    ansible_ssh_pass: 1234qwer
+    ansible_become_password: 1234qwer
   roles:
     - name: zansin-control-server
       # Add import statement for zansin-control-server role

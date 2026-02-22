@@ -26,8 +26,8 @@ class AtkWebServer(object):
     
     def stopserver(self):
         try:
-            session = requests.Session()  
-            session.get(self.url + "/stopserver")
+            session = requests.Session()
+            session.get(self.url + "/stopserver", timeout=5)
             return True
         except requests.exceptions.RequestException as e:
             #print(e)

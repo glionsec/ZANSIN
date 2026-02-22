@@ -36,8 +36,8 @@ print_zansin $CYAN
 # Install packages and clone repository
 deploy_status "Installing required packages..." $YELLOW
 sudo apt update &>/dev/null && sudo apt install -y ansible sshpass git &>/dev/null
-git clone https://github.com/zansin-sec/zansin.git &>/dev/null
-cd zansin/playbook &>/dev/null
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/playbook"
 
 # Enter IP addresses
 deploy_status "Enter new IP addresses..." $CYAN
@@ -71,7 +71,7 @@ deploy_status "ZANSIN environment setup complete!" $GREEN
 
 sshpass -p "Passw0rd!23" ssh -o StrictHostKeyChecking=no "vendor@$training_ip" << EOF
   cd /home/vendor/game-api
-  docker-compose up -d
+  docker-compose build --no-cache && docker-compose up -d
 EOF
 
 # Set up Red Controller
@@ -83,13 +83,23 @@ RED_CONTROLLER_ATTACK_CPANFILE_PATH="$RED_CONTROLLER_REMOTE_PATH/attack/cpanfile
 RED_CONTROLLER_ATTACK_C2S_PATH="$RED_CONTROLLER_REMOTE_PATH/attack/tools/c2s/start_c2s.sh"
 
 # Ensure the remote directory exists
-sshpass -p "$current_password" ssh -o StrictHostKeyChecking=no "zansin@${control_ip}" "mkdir -p $RED_CONTROLLER_REMOTE_PATH"
+sshpass -p "$current_password" ssh -o StrictHostKeyChecking=no "zansin@${control_ip}" \
+  "echo '$current_password' | sudo -S bash -c 'mkdir -p $RED_CONTROLLER_REMOTE_PATH && chown -R zansin:zansin /home/zansin'"
 
 # Rsync to transfer files
 sshpass -p "$current_password" rsync -avz -e "ssh -o StrictHostKeyChecking=no" $RED_CONTROLLER_LOCAL_PATH "zansin@${control_ip}:$RED_CONTROLLER_REMOTE_PATH"
 
+# Rsync documents directory (used by web controller documents tab)
+DOCUMENTS_LOCAL_PATH="$SCRIPT_DIR/documents/"
+if [ -d "$DOCUMENTS_LOCAL_PATH" ]; then
+  sshpass -p "$current_password" ssh -o StrictHostKeyChecking=no "zansin@${control_ip}" \
+    "mkdir -p $RED_CONTROLLER_REMOTE_PATH/documents"
+  sshpass -p "$current_password" rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
+    "$DOCUMENTS_LOCAL_PATH" "zansin@${control_ip}:$RED_CONTROLLER_REMOTE_PATH/documents/"
+fi
+
 # Execute commands on the remote server
-sshpass -p "$current_password" ssh -t "zansin@${control_ip}" << EOF
+sshpass -p "$current_password" ssh "zansin@${control_ip}" bash << EOF
   while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
     echo "Waiting for other software managers to finish..."
     sleep 10
@@ -98,6 +108,8 @@ sshpass -p "$current_password" ssh -t "zansin@${control_ip}" << EOF
   echo "$current_password" | sudo -S apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip
   echo "$current_password" | sudo -S apt install -y carton nmap nikto
   echo "$current_password" | sudo -S apt install make build-essential
+  # WireGuard VPN setup
+  echo "$current_password" | sudo -S bash $RED_CONTROLLER_REMOTE_PATH/wireguard_setup.sh "$control_ip"
   echo "$current_password" | sudo -S carton install --cpanfile $RED_CONTROLLER_ATTACK_CPANFILE_PATH
   chmod +x $RED_CONTROLLER_ATTACK_C2S_PATH
   cd $RED_CONTROLLER_REMOTE_PATH

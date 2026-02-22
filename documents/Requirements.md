@@ -36,7 +36,7 @@ sudo apt install openssh-server
 The user account `zansin` should be pre-created with sudo privileges. If the user account does not exist, you can create it by running the following commands:
 
 ```bash
-sudo useradd zansin
+sudo useradd -m zansin
 sudo usermod -aG sudo zansin
 echo "zansin:YOUR_PASSWORD" | sudo chpasswd
 ```

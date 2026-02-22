@@ -1,1 +1,26 @@
 ---
+- name: Deploy documents to red-controller
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../documents/"
+    dest: "/home/zansin/red-controller/documents/"
+    owner: zansin
+    group: zansin
+    mode: "0644"
+    directory_mode: "0755"
+
+- name: Deploy images to red-controller
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../images/"
+    dest: "/home/zansin/red-controller/images/"
+    owner: zansin
+    group: zansin
+    mode: "0644"
+    directory_mode: "0755"
+
+- name: Deploy wireguard_setup.sh to red-controller
+  ansible.builtin.copy:
+    src: "wireguard_setup.sh"
+    dest: "/home/zansin/red-controller/wireguard_setup.sh"
+    owner: zansin
+    group: zansin
+    mode: "0755"

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZANSIN Web Controller</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   body { font-family: 'Courier New', monospace; }
   .log-box { background: #0d1117; color: #c9d1d9; font-size: 0.75rem; }
@@ -15,15 +16,159 @@
   .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
   .badge-running  { background:#22c55e; }
   .badge-finished { background:#6b7280; }
-  tr:hover td { background: #1f2937; }
+
+  /* Markdown viewer body */
+  #md-modal-body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: #e5e7eb;
+  }
+  #md-modal-body h1,
+  #md-modal-body h2,
+  #md-modal-body h3,
+  #md-modal-body h4,
+  #md-modal-body h5,
+  #md-modal-body h6 {
+    color: #93c5fd;
+    font-weight: 700;
+    margin-top: 1.4em;
+    margin-bottom: 0.5em;
+    line-height: 1.3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #md-modal-body h1 { font-size: 1.4rem; border-bottom: 1px solid #374151; padding-bottom: 0.3em; }
+  #md-modal-body h2 { font-size: 1.2rem; border-bottom: 1px solid #374151; padding-bottom: 0.2em; }
+  #md-modal-body h3 { font-size: 1.05rem; }
+  #md-modal-body p  { margin-bottom: 0.8em; }
+  #md-modal-body strong { color: #f9fafb; font-weight: 700; }
+  #md-modal-body em     { color: #fcd34d; font-style: italic; }
+  #md-modal-body a  { color: #60a5fa; text-decoration: underline; }
+  #md-modal-body a:hover { color: #93c5fd; }
+  #md-modal-body code {
+    background: #111827;
+    color: #4ade80;
+    padding: 0.15em 0.45em;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+  }
+  #md-modal-body pre {
+    background: #0d1117;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    overflow-x: auto;
+    margin-bottom: 1em;
+  }
+  #md-modal-body pre code {
+    background: none;
+    color: #d1fae5;
+    padding: 0;
+    font-size: 0.85rem;
+    border-radius: 0;
+  }
+  #md-modal-body ul { list-style: disc;    margin: 0 0 0.8em 1.6em; }
+  #md-modal-body ol { list-style: decimal; margin: 0 0 0.8em 1.6em; }
+  #md-modal-body li { margin-bottom: 0.25em; }
+  #md-modal-body blockquote {
+    border-left: 4px solid #4b5563;
+    padding-left: 1em;
+    color: #9ca3af;
+    margin: 0.8em 0;
+    font-style: italic;
+  }
+  #md-modal-body hr {
+    border: none;
+    border-top: 1px solid #374151;
+    margin: 1.2em 0;
+  }
+  #md-modal-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 1em;
+    font-size: 0.85em;
+  }
+  #md-modal-body th,
+  #md-modal-body td {
+    border: 1px solid #374151;
+    padding: 0.4em 0.8em;
+    text-align: left;
+  }
+  #md-modal-body th {
+    background: #1f2937;
+    color: #93c5fd;
+    font-weight: 700;
+  }
+  #md-modal-body tr:nth-child(even) { background: #1f2937; }
+  #md-modal-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 0.5em 0;
+    display: block;
+  }
+
+  /* Action tooltip */
+  .action-info-btn { position: relative; display: inline-block; }
+  .action-tooltip {
+    display: none;
+    position: absolute;
+    z-index: 50;
+    left: 0;
+    top: 100%;
+    margin-top: 4px;
+    width: 260px;
+    background: #374151;
+    border: 1px solid #4b5563;
+    color: #e5e7eb;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    white-space: normal;
+    pointer-events: none;
+  }
+  .action-info-btn:hover .action-tooltip { display: block; }
 </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<!-- ================================================================ LOGIN OVERLAY -->
+<div id="login-overlay" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+  <div class="bg-gray-800 border border-gray-700 p-8 rounded-lg shadow-xl w-80">
+    <h1 class="text-xl font-bold text-white mb-6 text-center">ZANSIN Web Controller</h1>
+    <div class="mb-3">
+      <label class="block text-xs text-gray-400 mb-1">ユーザー名</label>
+      <input id="login-username" type="text" placeholder="username"
+        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <div class="mb-4">
+      <label class="block text-xs text-gray-400 mb-1">パスワード</label>
+      <input id="login-password" type="password" placeholder="password"
+        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button onclick="doLogin()"
+      class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded transition">
+      ログイン
+    </button>
+    <p id="login-error" class="text-red-400 text-xs mt-2 hidden text-center"></p>
+  </div>
+</div>
 
 <!-- Header -->
 <header class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center gap-4">
   <span class="text-blue-400 font-bold text-lg">▶ ZANSIN Web Controller</span>
   <span class="text-gray-500 text-sm" id="server-time"></span>
+  <div class="ml-auto flex items-center gap-3">
+    <span id="current-user-badge" class="text-xs text-gray-400 hidden"></span>
+    <button id="logout-btn" onclick="doLogout()"
+      class="hidden text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition">
+      ログアウト
+    </button>
+  </div>
 </header>
 
 <!-- Tabs -->
@@ -31,13 +176,17 @@
   <button class="tab-btn active py-3 text-sm font-medium" data-tab="sessions">演習管理</button>
   <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="monitor">リアルタイムモニター</button>
   <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="ranking">ランキング・比較</button>
-  <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="scenario">シナリオ編集</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400 admin-only" data-tab="scenario">シナリオ編集</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400 admin-only" data-tab="setup">セットアップ</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400 admin-only" data-tab="training">トレーニング環境</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400" data-tab="docs">ドキュメント</button>
+  <button class="tab-btn py-3 text-sm font-medium text-gray-400 admin-only" data-tab="vpn">VPN管理</button>
 </nav>
 
 <!-- ================================================================ TAB 1: Sessions -->
 <div id="tab-sessions" class="tab-content p-6">
-  <!-- New session form -->
-  <div class="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-6">
+  <!-- New session form (admin only) -->
+  <div id="new-session-panel" class="admin-only bg-gray-800 border border-gray-700 rounded-lg p-5 mb-6">
     <h2 class="text-blue-400 font-bold mb-4">+ 新規演習開始</h2>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
       <div>
@@ -59,9 +208,7 @@
         <label class="block text-xs text-gray-400 mb-1">シナリオ</label>
         <select id="new-scenario"
           class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
-          <option value="0">0 – Dev (全ステップ)</option>
-          <option value="1" selected>1 – 最難度</option>
-          <option value="2">2 – 中難度</option>
+          <!-- dynamically populated -->
         </select>
       </div>
     </div>
@@ -72,29 +219,36 @@
     <span id="start-msg" class="ml-3 text-sm text-gray-400"></span>
   </div>
 
-  <!-- Session list -->
-  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
-      <h2 class="font-bold text-sm">演習一覧</h2>
-      <button onclick="refreshSessions()" class="text-xs text-gray-400 hover:text-white">↻ 更新</button>
+  <!-- VPN download card (trainee only) -->
+  <div id="vpn-download-card" class="hidden bg-gray-800 border border-blue-800 rounded-lg p-4 mb-6">
+    <p class="text-blue-300 font-semibold text-sm">VPN設定</p>
+    <p class="text-xs text-gray-400 mt-1">WireGuard クライアント設定をダウンロードしてトレーニングマシンに接続してください。</p>
+    <button onclick="downloadMyVpnConfig()"
+      class="mt-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded">
+      VPN設定をダウンロード
+    </button>
+  </div>
+
+  <!-- 演習一覧 カードボード -->
+  <div id="active-panel" class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">演習一覧</h2>
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-gray-500">自動更新:</label>
+        <select id="refresh-interval" onchange="setAutoRefresh(this.value)"
+          class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-400">
+          <option value="0">OFF</option>
+          <option value="5000">5秒</option>
+          <option value="10000">10秒</option>
+          <option value="30000" selected>30秒</option>
+          <option value="60000">1分</option>
+          <option value="300000">5分</option>
+        </select>
+        <button onclick="refreshSessions()" title="今すぐ更新"
+          class="text-xs text-gray-400 hover:text-white px-2 py-1">↻</button>
+      </div>
     </div>
-    <table class="w-full text-sm">
-      <thead class="bg-gray-750">
-        <tr class="text-gray-400 text-xs">
-          <th class="text-left px-5 py-2">学習者</th>
-          <th class="text-left px-5 py-2">Training IP</th>
-          <th class="text-left px-5 py-2">Scen.</th>
-          <th class="text-left px-5 py-2">ステータス</th>
-          <th class="text-left px-5 py-2">開始時刻</th>
-          <th class="text-left px-5 py-2">Tech.Pt</th>
-          <th class="text-left px-5 py-2">Ope.%</th>
-          <th class="text-left px-5 py-2">操作</th>
-        </tr>
-      </thead>
-      <tbody id="session-table-body">
-        <tr><td colspan="8" class="px-5 py-4 text-gray-500 text-center">読み込み中...</td></tr>
-      </tbody>
-    </table>
+    <div id="active-cards" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
   </div>
 </div>
 
@@ -117,7 +271,20 @@
 <div id="tab-ranking" class="tab-content p-6 hidden">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-blue-400 font-bold">ランキング</h2>
-    <button onclick="refreshRanking()" class="text-xs text-gray-400 hover:text-white">↻ 更新</button>
+    <div class="flex items-center gap-2">
+      <label class="text-xs text-gray-500">自動更新:</label>
+      <select id="ranking-refresh-interval" onchange="setAutoRefreshRanking(this.value)"
+        class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-400">
+        <option value="0">OFF</option>
+        <option value="5000">5秒</option>
+        <option value="10000">10秒</option>
+        <option value="30000" selected>30秒</option>
+        <option value="60000">1分</option>
+        <option value="300000">5分</option>
+      </select>
+      <button onclick="refreshRanking()" title="今すぐ更新"
+        class="text-xs text-gray-400 hover:text-white px-2 py-1">↻</button>
+    </div>
   </div>
 
   <!-- Ranking table -->
@@ -152,24 +319,55 @@
 </div>
 
 <!-- ================================================================ TAB 4: Scenario Editor -->
+
 <div id="tab-scenario" class="tab-content p-6 hidden">
-  <div class="flex items-center gap-4 mb-4">
+  <div class="flex items-center gap-3 mb-4 flex-wrap">
     <h2 class="text-blue-400 font-bold">シナリオ編集</h2>
     <select id="scen-num-select" onchange="loadScenarioEditor()"
       class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none focus:border-blue-400">
-      <option value="0">Scenario 0 – Dev</option>
-      <option value="1" selected>Scenario 1 – 最難度</option>
-      <option value="2">Scenario 2 – 中難度</option>
+      <!-- dynamically populated -->
     </select>
+    <button onclick="showNewScenarioPanel()" title="新規シナリオ作成"
+      class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">＋ 新規</button>
+    <button onclick="deleteCurrentScenario()" title="このシナリオを削除"
+      class="bg-red-700 hover:bg-red-600 text-white text-xs px-3 py-1 rounded">🗑 削除</button>
     <button onclick="addScenarioStep()"
-      class="bg-gray-600 hover:bg-gray-500 text-sm px-3 py-1 rounded transition">
-      + ステップ追加
-    </button>
+      class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1 rounded">＋ ステップ追加</button>
     <button onclick="saveScenario()"
-      class="bg-blue-600 hover:bg-blue-500 text-sm px-4 py-1 rounded transition">
-      💾 保存
-    </button>
-    <span id="scen-save-msg" class="text-sm text-gray-400"></span>
+      class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">💾 保存</button>
+    <span id="scen-save-msg" class="text-xs"></span>
+  </div>
+
+  <!-- 新規シナリオ作成パネル (hidden by default) -->
+  <div id="new-scenario-panel" class="hidden bg-gray-800 border border-gray-600 rounded-lg p-4 mb-4">
+    <h3 class="text-sm font-bold text-blue-300 mb-3">新規シナリオ作成</h3>
+    <div class="flex items-center gap-3 flex-wrap">
+      <div>
+        <label class="text-xs text-gray-400 block mb-1">シナリオ名</label>
+        <input id="new-scen-name" type="text" placeholder="例: 初級者向け"
+          class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-40 focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 block mb-1">コピー元 (任意)</label>
+        <select id="new-scen-copy"
+          class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400">
+          <option value="">空で作成</option>
+          <!-- dynamically populated -->
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 block mb-1">演習時間 (分)</label>
+        <input id="new-scen-duration" type="number" min="1" placeholder="未設定 = 240"
+          class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-28 focus:outline-none focus:border-blue-400">
+      </div>
+      <div class="self-end flex gap-2">
+        <button onclick="createNewScenario()"
+          class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">作成</button>
+        <button onclick="hideNewScenarioPanel()"
+          class="bg-gray-600 hover:bg-gray-500 text-white text-xs px-3 py-1 rounded">キャンセル</button>
+      </div>
+    </div>
+    <p id="new-scen-msg" class="text-xs mt-2"></p>
   </div>
 
   <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
@@ -188,14 +386,245 @@
   </div>
 </div>
 
+<!-- ================================================================ TAB 5: Setup -->
+<div id="tab-setup" class="tab-content p-6 hidden">
+  <div id="setup-unavailable-msg" class="hidden bg-yellow-900 border border-yellow-600 rounded-lg p-4 mb-4 text-yellow-200 text-sm">
+    ⚠ セットアップ機能は利用できません。
+  </div>
+
+  <div id="setup-available-content">
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-4">
+      <h2 class="text-blue-400 font-bold mb-4">Ansible デプロイ設定</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Training Machine IP（複数可）</label>
+          <div id="setup-training-ips-list" class="flex flex-col gap-1 mb-1"></div>
+          <button type="button" onclick="addTrainingIpRow()"
+            class="text-xs text-blue-400 hover:text-blue-300 mt-1">＋ Training Machine を追加</button>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Control Server IP</label>
+          <input id="setup-control-ip" type="text" placeholder="192.168.0.6"
+            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">zansin ユーザーパスワード</label>
+          <input id="setup-password" type="password" placeholder="パスワード"
+            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+        </div>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <label class="text-xs text-gray-400">デプロイ範囲:</label>
+        <label class="flex items-center gap-1 text-sm cursor-pointer">
+          <input type="radio" name="setup-scope" value="training_only" checked class="accent-blue-500">
+          Training のみ (推奨)
+        </label>
+        <label class="flex items-center gap-1 text-sm cursor-pointer">
+          <input type="radio" name="setup-scope" value="all" class="accent-blue-500">
+          全体デプロイ
+        </label>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="setup-run-btn" onclick="runSetup()"
+          class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded transition">
+          ▶ デプロイ実行
+        </button>
+        <span id="setup-status-badge" class="text-xs text-gray-400"></span>
+      </div>
+    </div>
+
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-bold">Ansible 出力</h3>
+        <button onclick="document.getElementById('setup-logbox').innerHTML=''"
+          class="text-xs text-gray-500 hover:text-white">🗑 クリア</button>
+      </div>
+      <div id="setup-logbox" class="log-box p-3 h-96 overflow-y-auto whitespace-pre-wrap rounded"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ TAB 6: Training Environment -->
+<div id="tab-training" class="tab-content p-6 hidden">
+  <div class="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-4">
+    <h2 class="text-blue-400 font-bold mb-4">トレーニング環境 接続設定</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Training Machine IP</label>
+        <input id="training-ip-input" type="text" placeholder="192.168.0.5"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">vendor パスワード</label>
+        <input id="training-password-input" type="password" value="Passw0rd!23"
+          class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+    </div>
+    <div class="flex gap-3 flex-wrap">
+      <button onclick="checkTrainingStatus()"
+        class="bg-blue-600 hover:bg-blue-500 text-sm font-medium px-4 py-2 rounded transition">
+        🔍 状態確認
+      </button>
+      <button onclick="trainingAction('start')"
+        class="bg-green-700 hover:bg-green-600 text-sm font-medium px-4 py-2 rounded transition">
+        ▶ 全サービス起動
+      </button>
+      <button onclick="trainingAction('stop')"
+        class="bg-red-800 hover:bg-red-700 text-sm font-medium px-4 py-2 rounded transition">
+        ■ 全サービス停止
+      </button>
+      <span id="training-action-msg" class="self-center text-xs text-gray-400"></span>
+    </div>
+  </div>
+
+  <!-- Service table -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden mb-4">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-gray-400 text-xs bg-gray-750">
+          <th class="text-left px-5 py-2">サービス</th>
+          <th class="text-left px-5 py-2">ポート</th>
+          <th class="text-left px-5 py-2">到達性</th>
+          <th class="text-left px-5 py-2">コンテナ状態</th>
+          <th class="text-left px-5 py-2">操作</th>
+        </tr>
+      </thead>
+      <tbody id="training-service-tbody">
+        <tr><td colspan="5" class="px-5 py-4 text-gray-500 text-center">「状態確認」ボタンで取得してください</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Command output -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="text-sm font-bold">コマンド出力</h3>
+      <button onclick="document.getElementById('training-output').textContent=''"
+        class="text-xs text-gray-500 hover:text-white">🗑 クリア</button>
+    </div>
+    <pre id="training-output" class="log-box p-3 h-48 overflow-y-auto whitespace-pre-wrap rounded text-xs"></pre>
+  </div>
+</div>
+
+<!-- ================================================================ TAB 7: Documents -->
+<div id="tab-docs" class="tab-content p-6 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-blue-400 font-bold">ドキュメント</h2>
+    <button onclick="initDocsTab()" title="再読み込み"
+      class="text-xs text-gray-400 hover:text-white px-2 py-1">↻ 再読み込み</button>
+  </div>
+  <div id="docs-content">
+    <p class="text-gray-500 text-sm">読み込み中...</p>
+  </div>
+</div>
+
+<!-- ================================================================ TAB 8: VPN Management -->
+<div id="tab-vpn" class="tab-content p-6 hidden">
+
+  <!-- User management section -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-6">
+    <h2 class="text-blue-400 font-bold mb-4">ユーザー管理</h2>
+
+    <!-- Create user form -->
+    <div class="flex items-end gap-3 mb-4 flex-wrap">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">ユーザー名</label>
+        <input id="vpn-new-username" type="text" placeholder="alice"
+          class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-36 focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">パスワード</label>
+        <input id="vpn-new-password" type="password" placeholder="password"
+          class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-36 focus:outline-none focus:border-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">ロール</label>
+        <select id="vpn-new-role"
+          class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400">
+          <option value="trainee">trainee</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+      <button onclick="createVpnUser()"
+        class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded">
+        ＋ 作成
+      </button>
+      <span id="vpn-user-msg" class="text-xs text-gray-400"></span>
+    </div>
+
+    <!-- Users table -->
+    <div class="overflow-hidden rounded-lg border border-gray-700">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-400 text-xs bg-gray-750">
+            <th class="text-left px-4 py-2">ユーザー名</th>
+            <th class="text-left px-4 py-2">ロール</th>
+            <th class="text-left px-4 py-2">割り当てピア</th>
+            <th class="text-left px-4 py-2">操作</th>
+          </tr>
+        </thead>
+        <tbody id="vpn-users-tbody">
+          <tr><td colspan="4" class="px-4 py-3 text-gray-500 text-center">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VPN peer assignment section -->
+  <div class="bg-gray-800 border border-gray-700 rounded-lg p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-blue-400 font-bold">VPN ピア管理</h2>
+      <span id="vpn-status-badge" class="text-xs text-gray-400"></span>
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-gray-700">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-400 text-xs bg-gray-750">
+            <th class="text-left px-4 py-2">ピア ID</th>
+            <th class="text-left px-4 py-2">VPN IP</th>
+            <th class="text-left px-4 py-2">Training IP</th>
+            <th class="text-left px-4 py-2">割り当てユーザー</th>
+            <th class="text-left px-4 py-2">変更</th>
+            <th class="text-left px-4 py-2">設定 DL</th>
+          </tr>
+        </thead>
+        <tbody id="vpn-peers-tbody">
+          <tr><td colspan="6" class="px-4 py-3 text-gray-500 text-center">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ MARKDOWN MODAL -->
+<div id="md-modal" class="fixed inset-0 bg-black/70 hidden z-40 flex items-start justify-center pt-10">
+  <div class="bg-gray-800 border border-gray-600 rounded-lg w-full max-w-3xl mx-4 flex flex-col max-h-[85vh]">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+      <span id="md-modal-title" class="font-bold text-sm text-blue-300"></span>
+      <div class="flex items-center gap-3">
+        <a id="md-download-btn" href="#" download
+           class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">↓ ダウンロード</a>
+        <button onclick="closeMdModal()" class="text-gray-400 hover:text-white text-xs">✕ 閉じる</button>
+      </div>
+    </div>
+    <div id="md-modal-body" class="overflow-y-auto p-6">
+    </div>
+  </div>
+</div>
+
 <!-- ================================================================ SCRIPT -->
 <script>
 // ── Globals ──────────────────────────────────────────────────────────────────
 let allSessions = [];
 let availableActions = [];
+let actionDescriptions = {};
 let scenarioData = {};
+let scenarioMeta = {};     // {str(num): {name, step_count}}
 let monitorPanes = {};      // session_id -> { es, el }
 let refreshTimer = null;
+let rankingTimer = null;
+let currentRole = null;    // "admin" | "trainee" | null
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 function fmtTime(iso) {
@@ -214,12 +643,17 @@ function badge(status) {
   return `<span class="px-2 py-0.5 text-xs text-white rounded ${cls}">${label}</span>`;
 }
 
+function stripAnsi(s) {
+  return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 function colorizeLog(line) {
-  if (line.includes('[*]')) return `<span class="ok">${escHtml(line)}</span>`;
-  if (line.includes('[+]')) return `<span class="note">${escHtml(line)}</span>`;
-  if (line.includes('[-]')) return `<span class="fail">${escHtml(line)}</span>`;
-  if (line.includes('[!]')) return `<span class="warn">${escHtml(line)}</span>`;
-  return escHtml(line);
+  const stripped = stripAnsi(line);
+  if (stripped.includes('[*]')) return `<span class="ok">${escHtml(stripped)}</span>`;
+  if (stripped.includes('[+]')) return `<span class="note">${escHtml(stripped)}</span>`;
+  if (stripped.includes('[-]')) return `<span class="fail">${escHtml(stripped)}</span>`;
+  if (stripped.includes('[!]')) return `<span class="warn">${escHtml(stripped)}</span>`;
+  return escHtml(stripped);
 }
 
 function escHtml(s) {
@@ -232,6 +666,96 @@ function startClock() {
   setInterval(() => {
     el.textContent = new Date().toLocaleString('ja-JP');
   }, 1000);
+}
+
+// ── Authentication ────────────────────────────────────────────────────────────
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+
+  if (!username || !password) {
+    errEl.textContent = 'ユーザー名とパスワードを入力してください';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      errEl.textContent = data.detail || 'ログインに失敗しました';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    errEl.classList.add('hidden');
+    applyRole(data.role, data.username);
+    document.getElementById('login-overlay').classList.add('hidden');
+    // Bootstrap app data
+    refreshSessions();
+    fetch('/api/scenario/meta').then(r => r.json()).then(meta => {
+      scenarioMeta = meta;
+      updateSessionScenarioSelect();
+    }).catch(() => {});
+    setAutoRefresh(30000);
+    setAutoRefreshRanking(30000);
+  } catch (e) {
+    errEl.textContent = 'ネットワークエラー: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function doLogout() {
+  await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
+  location.reload();
+}
+
+function applyRole(role, username) {
+  currentRole = role;
+
+  // Show header info
+  const badge = document.getElementById('current-user-badge');
+  badge.textContent = `${username} (${role})`;
+  badge.classList.remove('hidden');
+  document.getElementById('logout-btn').classList.remove('hidden');
+
+  // Hide admin-only tabs and UI elements for trainee
+  if (role !== 'admin') {
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+    // Show VPN download card for trainee
+    const vpnCard = document.getElementById('vpn-download-card');
+    if (vpnCard) vpnCard.classList.remove('hidden');
+  } else {
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+  }
+}
+
+// Check if already logged in on page load
+async function checkAuth() {
+  try {
+    const res = await fetch('/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      applyRole(data.role, data.username);
+      document.getElementById('login-overlay').classList.add('hidden');
+      // Bootstrap app data
+      refreshSessions();
+      fetch('/api/scenario/meta').then(r => r.json()).then(meta => {
+        scenarioMeta = meta;
+        updateSessionScenarioSelect();
+      }).catch(() => {});
+      setAutoRefresh(30000);
+      setAutoRefreshRanking(30000);
+    }
+    // If not ok, login overlay stays visible
+  } catch (e) {
+    // Network error, login overlay stays
+  }
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -249,6 +773,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'ranking') refreshRanking();
     if (btn.dataset.tab === 'scenario') initScenarioTab();
     if (btn.dataset.tab === 'monitor') refreshMonitorSelect();
+    if (btn.dataset.tab === 'setup') initSetupTab();
+    if (btn.dataset.tab === 'training') initTrainingTab();
+    if (btn.dataset.tab === 'docs') initDocsTab();
+    if (btn.dataset.tab === 'vpn') initVpnTab();
   });
 });
 
@@ -256,40 +784,167 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 async function refreshSessions() {
   try {
     const res = await fetch('/api/sessions');
+    if (res.status === 401) return;  // not logged in yet
     allSessions = await res.json();
-    renderSessionTable();
+    renderActiveSessions(allSessions);
   } catch (e) {
     console.error(e);
   }
 }
 
-function renderSessionTable() {
-  const tbody = document.getElementById('session-table-body');
-  if (!allSessions.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-4 text-gray-500 text-center">演習なし</td></tr>';
+function setAutoRefresh(intervalMs) {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+  const ms = parseInt(intervalMs, 10);
+  if (ms > 0) {
+    refreshTimer = setInterval(refreshSessions, ms);
+  }
+}
+
+function renderActiveSessions(sessions) {
+  const container = document.getElementById('active-cards');
+
+  if (!sessions.length) {
+    container.innerHTML = '<p class="text-gray-500 text-sm col-span-full">演習なし</p>';
     return;
   }
 
-  tbody.innerHTML = allSessions.map(s => {
-    const tp = s.technical_point != null ? s.technical_point + ' pt' : '—';
-    const or = s.operation_ratio != null ? s.operation_ratio + ' %' : '—';
-    const stopBtn = s.status === 'running'
-      ? `<button onclick="stopSession('${s.session_id}')"
-           class="bg-red-800 hover:bg-red-700 text-xs px-2 py-1 rounded">■ 停止</button>`
-      : '';
-    const monBtn = `<button onclick="openMonitor('${s.session_id}')"
-        class="ml-1 bg-gray-600 hover:bg-gray-500 text-xs px-2 py-1 rounded">📋 ログ</button>`;
-    return `<tr class="border-t border-gray-700 cursor-pointer">
-      <td class="px-5 py-2 font-medium">${escHtml(s.learner_name)}</td>
-      <td class="px-5 py-2 text-gray-400">${escHtml(s.training_ip)}</td>
-      <td class="px-5 py-2">${s.scenario}</td>
-      <td class="px-5 py-2">${badge(s.status)}</td>
-      <td class="px-5 py-2 text-gray-400 text-xs">${fmtTime(s.start_time)}</td>
-      <td class="px-5 py-2">${tp}</td>
-      <td class="px-5 py-2">${or}</td>
-      <td class="px-5 py-2">${stopBtn}${monBtn}</td>
-    </tr>`;
+  // running first, then finished
+  const sorted = [
+    ...sessions.filter(s => s.status === 'running'),
+    ...sessions.filter(s => s.status !== 'running'),
+  ];
+
+  container.innerHTML = sorted.map(s => {
+    if (s.status === 'running') {
+      const _elapsedMinNow = (Date.now() - new Date(s.start_time).getTime()) / 60000;
+      const _overrun = _elapsedMinNow > s.duration_minutes;
+      const _cardBorder = _overrun ? 'border-orange-500' : 'border-green-700';
+      const _badgeCls   = _overrun ? 'text-orange-400' : 'text-green-400';
+      const _badgeText  = _overrun ? '⚠ 時間超過' : '● 実行中';
+      const stopBtn = currentRole === 'admin'
+        ? `<button onclick="stopSession('${s.session_id}')"
+                  class="text-xs px-3 py-1 bg-red-800 hover:bg-red-700 text-white rounded">
+            ■ 停止
+          </button>`
+        : '';
+      return `
+        <div class="bg-gray-800 border ${_cardBorder} rounded-lg p-4" data-session-id="${s.session_id}" data-duration="${s.duration_minutes}" data-start="${s.start_time}" data-status="running">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <span class="status-badge inline-flex items-center text-xs ${_badgeCls} mr-2">${_badgeText}</span>
+              <span class="font-semibold text-white">${escHtml(s.learner_name)}</span>
+            </div>
+            <span class="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded">シナリオ ${s.scenario}</span>
+          </div>
+          <div class="text-xs text-gray-400 mb-1">Training IP: <span class="text-gray-300 font-mono">${escHtml(s.training_ip)}</span></div>
+          <div class="text-xs text-gray-400 mb-2">開始: <span class="text-gray-300">${fmtTime(s.start_time)}</span></div>
+          <div class="text-sm text-gray-400 mb-2">
+            経過: <span class="elapsed font-mono text-white" data-start="${s.start_time}">--:--:--</span>
+          </div>
+          <div class="w-full bg-gray-700 rounded-full h-2 mb-1">
+            <div class="progress-bar bg-green-500 h-2 rounded-full transition-all" data-start="${s.start_time}" data-duration="${s.duration_minutes}" style="width:0%"></div>
+          </div>
+          <div class="text-xs text-gray-500 mb-3">
+            <span class="pct-label" data-start="${s.start_time}" data-duration="${s.duration_minutes}">0</span>% / ${s.duration_minutes} min
+          </div>
+          <div class="text-xs text-gray-300 mb-3 truncate" title="${escHtml(s.current_step || '')}">
+            ${escHtml(s.current_step || '演習中...')}
+          </div>
+          <div class="flex justify-between items-center">
+            ${stopBtn}
+            <button onclick="openMonitor('${s.session_id}')"
+                    class="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded">
+              ログを見る
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      const tp = s.technical_point != null ? `${s.technical_point} pt` : '—';
+      const or = s.operation_ratio != null ? `${s.operation_ratio} %` : '—';
+      return `
+        <div class="bg-gray-800 border border-gray-600 rounded-lg p-4" data-session-id="${s.session_id}">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <span class="inline-flex items-center text-xs text-gray-400 mr-2">■ 終了</span>
+              <span class="font-semibold text-white">${escHtml(s.learner_name)}</span>
+            </div>
+            <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">シナリオ ${s.scenario}</span>
+          </div>
+          <div class="text-xs text-gray-400 mb-1">Training IP: <span class="text-gray-300 font-mono">${escHtml(s.training_ip)}</span></div>
+          <div class="text-xs text-gray-400 mb-3">開始: <span class="text-gray-300">${fmtTime(s.start_time)}</span></div>
+          <div class="flex gap-4 mb-3">
+            <div class="text-xs">
+              <span class="text-gray-400">Tech.Pt: </span>
+              <span class="text-green-400 font-bold">${tp}</span>
+            </div>
+            <div class="text-xs">
+              <span class="text-gray-400">Ope.: </span>
+              <span class="text-blue-400 font-bold">${or}</span>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button onclick="openMonitor('${s.session_id}')"
+                    class="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded">
+              ログを見る
+            </button>
+          </div>
+        </div>
+      `;
+    }
   }).join('');
+
+  updateElapsedTimes();
+}
+
+function updateElapsedTimes() {
+  const now = Date.now();
+
+  document.querySelectorAll('.elapsed[data-start]').forEach(el => {
+    const start = new Date(el.dataset.start).getTime();
+    const diffMs = now - start;
+    const secs = Math.floor(diffMs / 1000);
+    const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+    const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+    const s = String(secs % 60).padStart(2, '0');
+    el.textContent = `${h}:${m}:${s}`;
+  });
+
+  document.querySelectorAll('.progress-bar[data-start]').forEach(el => {
+    const totalMin = parseInt(el.dataset.duration || '240', 10);
+    const start = new Date(el.dataset.start).getTime();
+    const elapsedMin = (now - start) / 60000;
+    const pct = Math.min(elapsedMin / totalMin * 100, 100).toFixed(1);
+    el.style.width = `${pct}%`;
+    const colorClass = pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-green-500';
+    el.className = el.className.replace(/bg-(?:green|yellow|red)-500/, colorClass);
+  });
+
+  document.querySelectorAll('.pct-label[data-start]').forEach(el => {
+    const totalMin = parseInt(el.dataset.duration || '240', 10);
+    const start = new Date(el.dataset.start).getTime();
+    const elapsedMin = (now - start) / 60000;
+    el.textContent = Math.min(elapsedMin / totalMin * 100, 100).toFixed(1);
+  });
+
+  // Overrun detection: update card border + status badge once per second
+  document.querySelectorAll('[data-status="running"][data-start][data-duration]').forEach(card => {
+    const totalMin = parseInt(card.dataset.duration || '240', 10);
+    const start = new Date(card.dataset.start).getTime();
+    const elapsedMin = (now - start) / 60000;
+    if (elapsedMin > totalMin) {
+      card.classList.remove('border-green-700');
+      card.classList.add('border-orange-500');
+      const badge = card.querySelector('.status-badge');
+      if (badge && !badge.classList.contains('text-orange-400')) {
+        badge.className = 'status-badge inline-flex items-center text-xs text-orange-400 mr-2';
+        badge.textContent = '⚠ 時間超過';
+      }
+    }
+  });
 }
 
 async function startSession() {
@@ -420,12 +1075,24 @@ function closeMonitorPane(sessionId) {
 }
 
 // ── TAB 3: Ranking ────────────────────────────────────────────────────────────
+function setAutoRefreshRanking(intervalMs) {
+  if (rankingTimer) {
+    clearInterval(rankingTimer);
+    rankingTimer = null;
+  }
+  const ms = parseInt(intervalMs, 10);
+  if (ms > 0) {
+    rankingTimer = setInterval(refreshRanking, ms);
+  }
+}
+
 async function refreshRanking() {
   try {
     const [rankRes, compRes] = await Promise.all([
       fetch('/api/ranking'),
       fetch('/api/comparison'),
     ]);
+    if (rankRes.status === 401) return;
     const ranking = await rankRes.json();
     const comp    = await compRes.json();
     renderRanking(ranking);
@@ -494,16 +1161,93 @@ function renderComparison(sessions) {
 
 // ── TAB 4: Scenario Editor ────────────────────────────────────────────────────
 async function initScenarioTab() {
-  if (availableActions.length === 0) {
-    const res = await fetch('/api/scenario/actions');
-    const data = await res.json();
-    availableActions = data.actions;
-  }
-  if (Object.keys(scenarioData).length === 0) {
-    const res = await fetch('/api/scenario');
-    scenarioData = await res.json();
-  }
+  const [actRes, metaRes, scRes] = await Promise.all([
+    fetch('/api/scenario/actions'),
+    fetch('/api/scenario/meta'),
+    fetch('/api/scenario'),
+  ]);
+  const actData = await actRes.json();
+  availableActions = actData.actions;
+  actionDescriptions = actData.descriptions || {};
+  scenarioMeta = await metaRes.json();
+  scenarioData = await scRes.json();
+
+  // Rebuild #scen-num-select
+  const sel = document.getElementById('scen-num-select');
+  const prev = sel.value;
+  sel.innerHTML = Object.keys(scenarioMeta).sort((a, b) => Number(a) - Number(b)).map(n =>
+    `<option value="${n}">${n} \u2013 ${escHtml(scenarioMeta[n].name)}</option>`
+  ).join('');
+  if (prev && sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+
+  updateSessionScenarioSelect();
   loadScenarioEditor();
+}
+
+function updateSessionScenarioSelect() {
+  const sel = document.getElementById('new-scenario');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = Object.keys(scenarioMeta).sort((a, b) => Number(a) - Number(b)).map(n =>
+    `<option value="${n}"${n === '1' ? ' selected' : ''}>${n} \u2013 ${escHtml(scenarioMeta[n].name)}</option>`
+  ).join('');
+  if (current && sel.querySelector(`option[value="${current}"]`)) sel.value = current;
+}
+
+function showNewScenarioPanel() {
+  const copySelect = document.getElementById('new-scen-copy');
+  copySelect.innerHTML = '<option value="">空で作成</option>' +
+    Object.keys(scenarioMeta).sort((a, b) => Number(a) - Number(b)).map(n =>
+      `<option value="${n}">${n} \u2013 ${escHtml(scenarioMeta[n].name)}</option>`
+    ).join('');
+  document.getElementById('new-scenario-panel').classList.remove('hidden');
+}
+
+function hideNewScenarioPanel() {
+  document.getElementById('new-scenario-panel').classList.add('hidden');
+  document.getElementById('new-scen-name').value = '';
+  document.getElementById('new-scen-duration').value = '';
+  document.getElementById('new-scen-msg').textContent = '';
+}
+
+async function createNewScenario() {
+  const name = document.getElementById('new-scen-name').value.trim();
+  if (!name) { document.getElementById('new-scen-msg').textContent = '名前を入力してください'; return; }
+  const copyVal = document.getElementById('new-scen-copy').value;
+  const durVal = document.getElementById('new-scen-duration').value;
+  const body = { name };
+  if (copyVal !== '') body.copy_from = parseInt(copyVal, 10);
+  if (durVal !== '') body.duration_minutes = parseInt(durVal, 10);
+
+  try {
+    const res = await fetch('/api/scenario/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    hideNewScenarioPanel();
+    await initScenarioTab();
+    document.getElementById('scen-num-select').value = String(data.scenario);
+    loadScenarioEditor();
+  } catch (e) {
+    document.getElementById('new-scen-msg').textContent = '\u2716 ' + e.message;
+  }
+}
+
+async function deleteCurrentScenario() {
+  const num = parseInt(document.getElementById('scen-num-select').value, 10);
+  const meta = scenarioMeta[String(num)];
+  const label = meta ? `${num} \u2013 ${meta.name}` : String(num);
+  if (!confirm(`シナリオ「${label}」を削除してよろしいですか？\n（この操作は元に戻せません）`)) return;
+  try {
+    const res = await fetch(`/api/scenario/${num}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    await initScenarioTab();
+  } catch (e) {
+    alert('削除失敗: ' + e.message);
+  }
 }
 
 function loadScenarioEditor() {
@@ -521,6 +1265,10 @@ function makeStepRow(num, step, idx) {
   const actionOpts = availableActions.map(a =>
     `<option value="${a}" ${a === step.action ? 'selected' : ''}>${a}</option>`
   ).join('');
+  const desc = actionDescriptions[step.action] || '';
+  const tooltipHtml = desc
+    ? `<span class="action-info-btn ml-1 text-gray-500 hover:text-blue-300 cursor-default select-none" id="info-btn-${idx}">ⓘ<span class="action-tooltip">${escHtml(desc)}</span></span>`
+    : '';
   return `<tr id="step-row-${idx}" class="border-t border-gray-700">
     <td class="px-4 py-1">
       <input type="text" value="${escHtml(step.step_id)}" data-field="step_id" data-idx="${idx}"
@@ -532,12 +1280,12 @@ function makeStepRow(num, step, idx) {
         class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-16 focus:outline-none focus:border-blue-400"
         oninput="updateStep(${idx}, 'delay', this.value)">
     </td>
-    <td class="px-4 py-1">
+    <td class="px-4 py-1 whitespace-nowrap">
       <select data-field="action" data-idx="${idx}"
         class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-400"
-        onchange="updateStep(${idx}, 'action', this.value)">
+        onchange="updateStepAction(${idx}, this.value)">
         ${actionOpts}
-      </select>
+      </select>${tooltipHtml}
     </td>
     <td class="px-4 py-1">
       <input type="text" value="${escHtml(step.cheat_count)}" data-field="cheat_count" data-idx="${idx}"
@@ -555,6 +1303,22 @@ function updateStep(idx, field, value) {
   const num = document.getElementById('scen-num-select').value;
   if (scenarioData[num] && scenarioData[num][idx]) {
     scenarioData[num][idx][field] = value;
+  }
+}
+
+function updateStepAction(idx, value) {
+  updateStep(idx, 'action', value);
+  // Update tooltip description
+  const infoBtn = document.getElementById('info-btn-' + idx);
+  if (infoBtn) {
+    const desc = actionDescriptions[value] || '';
+    const tooltipEl = infoBtn.querySelector('.action-tooltip');
+    if (desc) {
+      infoBtn.style.display = 'inline';
+      if (tooltipEl) tooltipEl.textContent = desc;
+    } else {
+      infoBtn.style.display = 'none';
+    }
   }
 }
 
@@ -607,11 +1371,636 @@ async function saveScenario() {
   }
 }
 
+// ── TAB 5: Setup ──────────────────────────────────────────────────────────────
+let setupSse = null;
+
+function addTrainingIpRow(ip = '') {
+  const list = document.getElementById('setup-training-ips-list');
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-2';
+  row.innerHTML = `
+    <input type="text" placeholder="192.168.0.x" value="${escHtml(ip)}"
+      class="setup-tip-input bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 font-mono focus:outline-none focus:border-blue-400">
+    <button type="button" onclick="removeTrainingIpRow(this)"
+      class="text-gray-500 hover:text-red-400 text-xs px-1">✕</button>
+  `;
+  list.appendChild(row);
+}
+
+function removeTrainingIpRow(btn) {
+  const list = document.getElementById('setup-training-ips-list');
+  if (list.children.length <= 1) return; // 最低 1 行残す
+  btn.closest('div').remove();
+}
+
+async function initSetupTab() {
+  try {
+    const res = await fetch('/api/setup/available');
+    const data = await res.json();
+    if (!data.available) {
+      const reasons = (data.reasons || []);
+      const reasonHtml = reasons.map(r => `<li>${escHtml(r)}</li>`).join('');
+      document.getElementById('setup-unavailable-msg').innerHTML =
+        `⚠ セットアップ機能は利用できません:<ul class="list-disc ml-5 mt-1">${reasonHtml}</ul>` +
+        `<p class="mt-2">リポジトリルートから <code>./web_controller.sh start</code> を実行してください。</p>`;
+      document.getElementById('setup-unavailable-msg').classList.remove('hidden');
+      document.getElementById('setup-available-content').classList.add('hidden');
+      return;
+    }
+    document.getElementById('setup-unavailable-msg').classList.add('hidden');
+    document.getElementById('setup-available-content').classList.remove('hidden');
+
+    // Pre-fill IPs from inventory
+    const cfgRes = await fetch('/api/setup/config');
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      const list = document.getElementById('setup-training-ips-list');
+      list.innerHTML = '';
+      const ips = cfg.training_ips && cfg.training_ips.length ? cfg.training_ips : [''];
+      ips.forEach(ip => addTrainingIpRow(ip));
+      if (cfg.control_ip) document.getElementById('setup-control-ip').value = cfg.control_ip;
+    } else {
+      // Ensure at least one row exists even on error
+      const list = document.getElementById('setup-training-ips-list');
+      if (!list.children.length) addTrainingIpRow();
+    }
+
+    // Show current status
+    updateSetupStatusBadge();
+  } catch (e) {
+    console.error('initSetupTab', e);
+  }
+}
+
+async function updateSetupStatusBadge() {
+  const badge = document.getElementById('setup-status-badge');
+  try {
+    const res = await fetch('/api/setup/status');
+    const s = await res.json();
+    if (s.running) {
+      badge.textContent = '● 実行中';
+      badge.className = 'text-xs text-green-400';
+    } else if (s.returncode === null) {
+      badge.textContent = '待機中';
+      badge.className = 'text-xs text-gray-400';
+    } else if (s.returncode === 0) {
+      badge.textContent = '✔ 完了 (成功)';
+      badge.className = 'text-xs text-green-400';
+    } else {
+      badge.textContent = `✖ 完了 (終了コード: ${s.returncode})`;
+      badge.className = 'text-xs text-red-400';
+    }
+  } catch (e) {
+    badge.textContent = '';
+  }
+}
+
+async function runSetup() {
+  const trainingIps = Array.from(
+    document.querySelectorAll('#setup-training-ips-list .setup-tip-input')
+  ).map(el => el.value.trim()).filter(Boolean);
+  const controlIp  = document.getElementById('setup-control-ip').value.trim();
+  const password   = document.getElementById('setup-password').value;
+  const scope      = document.querySelector('input[name="setup-scope"]:checked').value;
+  const badge      = document.getElementById('setup-status-badge');
+
+  if (!trainingIps.length || !controlIp || !password) {
+    badge.textContent = '⚠ 全フィールドを入力してください';
+    badge.className = 'text-xs text-yellow-400';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/setup/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ training_ips: trainingIps, control_ip: controlIp, password, scope }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      badge.textContent = '✖ ' + (err.detail || res.statusText);
+      badge.className = 'text-xs text-red-400';
+      return;
+    }
+  } catch (e) {
+    badge.textContent = '✖ ' + e.message;
+    badge.className = 'text-xs text-red-400';
+    return;
+  }
+
+  // Start SSE log stream
+  if (setupSse) { setupSse.close(); setupSse = null; }
+  const logbox = document.getElementById('setup-logbox');
+  logbox.innerHTML = '';
+
+  setupSse = new EventSource('/api/setup/stream');
+  setupSse.onmessage = (e) => {
+    const line = document.createElement('div');
+    line.innerHTML = colorizeLog(e.data);
+    logbox.appendChild(line);
+    logbox.scrollTop = logbox.scrollHeight;
+  };
+  setupSse.addEventListener('end', () => {
+    const line = document.createElement('div');
+    line.innerHTML = '<span class="text-gray-500">— デプロイ完了 —</span>';
+    logbox.appendChild(line);
+    logbox.scrollTop = logbox.scrollHeight;
+    setupSse.close();
+    setupSse = null;
+    updateSetupStatusBadge();
+  });
+  setupSse.onerror = () => {
+    if (setupSse) { setupSse.close(); setupSse = null; }
+    updateSetupStatusBadge();
+  };
+
+  badge.textContent = '● 実行中';
+  badge.className = 'text-xs text-green-400';
+}
+
+// ── TAB 6: Training Environment ───────────────────────────────────────────────
+
+function initTrainingTab() {
+  // Auto-fill training IP from latest session if available
+  if (allSessions.length > 0) {
+    const latestIp = allSessions[allSessions.length - 1].training_ip;
+    const ipInput = document.getElementById('training-ip-input');
+    if (ipInput && !ipInput.value && latestIp) {
+      ipInput.value = latestIp;
+    }
+  }
+}
+
+async function checkTrainingStatus() {
+  const ip  = document.getElementById('training-ip-input').value.trim();
+  const pwd = document.getElementById('training-password-input').value;
+  const msg = document.getElementById('training-action-msg');
+  if (!ip) { msg.textContent = '⚠ IPアドレスを入力してください'; return; }
+
+  msg.textContent = '確認中...';
+  msg.className = 'self-center text-xs text-gray-400';
+  const tbody = document.getElementById('training-service-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-gray-400 text-center">確認中...</td></tr>';
+
+  try {
+    const res = await fetch(`/api/training/status?ip=${encodeURIComponent(ip)}&password=${encodeURIComponent(pwd)}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    renderTrainingTable(data.services);
+    msg.textContent = '✔ 取得完了';
+    msg.className = 'self-center text-xs text-green-400';
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-5 py-4 text-red-400 text-center">エラー: ${escHtml(e.message)}</td></tr>`;
+    msg.textContent = '✖ エラー';
+    msg.className = 'self-center text-xs text-red-400';
+  }
+}
+
+function renderTrainingTable(services) {
+  const tbody = document.getElementById('training-service-tbody');
+  tbody.innerHTML = services.map(svc => {
+    const reachIcon = svc.reachable
+      ? '<span class="text-green-400">● 到達可</span>'
+      : '<span class="text-red-400">✕ 到達不可</span>';
+    const containerHtml = svc.container_status === 'N/A'
+      ? '<span class="text-gray-500">N/A</span>'
+      : svc.container_status.startsWith('SSH error')
+        ? `<span class="text-red-400 text-xs">${escHtml(svc.container_status)}</span>`
+        : svc.container_status === 'Not running'
+          ? '<span class="text-red-400">停止中</span>'
+          : `<span class="text-green-300 text-xs">${escHtml(svc.container_status)}</span>`;
+    const restartBtn = svc.container && svc.container_status !== 'N/A' && !svc.container_status.startsWith('SSH error')
+      ? `<button onclick="restartContainer('${escHtml(svc.container)}')"
+           class="bg-gray-600 hover:bg-gray-500 text-xs px-2 py-1 rounded">🔄 再起動</button>`
+      : '—';
+    return `<tr class="border-t border-gray-700">
+      <td class="px-5 py-2 font-medium">${escHtml(svc.name)}</td>
+      <td class="px-5 py-2 text-gray-400">${svc.port}</td>
+      <td class="px-5 py-2">${reachIcon}</td>
+      <td class="px-5 py-2">${containerHtml}</td>
+      <td class="px-5 py-2">${restartBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function trainingAction(action) {
+  const ip  = document.getElementById('training-ip-input').value.trim();
+  const pwd = document.getElementById('training-password-input').value;
+  const msg = document.getElementById('training-action-msg');
+  const out = document.getElementById('training-output');
+  if (!ip) { msg.textContent = '⚠ IPアドレスを入力してください'; return; }
+
+  msg.textContent = '実行中...';
+  msg.className = 'self-center text-xs text-gray-400';
+  out.textContent = '';
+
+  try {
+    const res = await fetch(`/api/training/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ training_ip: ip, password: pwd }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    out.textContent = data.output || '(出力なし)';
+    msg.textContent = '✔ 完了';
+    msg.className = 'self-center text-xs text-green-400';
+    // Refresh table after action
+    await checkTrainingStatus();
+  } catch (e) {
+    out.textContent = 'エラー: ' + e.message;
+    msg.textContent = '✖ エラー';
+    msg.className = 'self-center text-xs text-red-400';
+  }
+}
+
+async function restartContainer(containerName) {
+  const ip  = document.getElementById('training-ip-input').value.trim();
+  const pwd = document.getElementById('training-password-input').value;
+  const msg = document.getElementById('training-action-msg');
+  const out = document.getElementById('training-output');
+
+  msg.textContent = `${containerName} を再起動中...`;
+  msg.className = 'self-center text-xs text-gray-400';
+  out.textContent = '';
+
+  try {
+    const res = await fetch('/api/training/restart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ training_ip: ip, password: pwd, container: containerName }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    out.textContent = data.output || '(出力なし)';
+    msg.textContent = `✔ ${containerName} 再起動完了`;
+    msg.className = 'self-center text-xs text-green-400';
+    await checkTrainingStatus();
+  } catch (e) {
+    out.textContent = 'エラー: ' + e.message;
+    msg.textContent = '✖ エラー';
+    msg.className = 'self-center text-xs text-red-400';
+  }
+}
+
+// ── TAB 7: Documents ──────────────────────────────────────────────────────────
+async function initDocsTab() {
+  const container = document.getElementById('docs-content');
+  container.innerHTML = '<p class="text-gray-500 text-sm">読み込み中...</p>';
+  try {
+    const res = await fetch('/api/docs');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      container.innerHTML = `<p class="text-red-400 text-sm">エラー: ${escHtml(err.detail || res.statusText)}</p>`;
+      return;
+    }
+    const data = await res.json();
+    renderDocs(data.files);
+  } catch (e) {
+    container.innerHTML = `<p class="text-red-400 text-sm">エラー: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderDocs(files) {
+  const container = document.getElementById('docs-content');
+  if (!files || !files.length) {
+    container.innerHTML = '<p class="text-gray-500 text-sm">ドキュメントが見つかりません。</p>';
+    return;
+  }
+
+  // Group by directory
+  const groups = {};
+  for (const f of files) {
+    const dir = f.directory || '(ルート)';
+    if (!groups[dir]) groups[dir] = [];
+    groups[dir].push(f);
+  }
+
+  const html = Object.keys(groups).sort().map(dir => {
+    const filesHtml = groups[dir].map(f => {
+      const sizeStr = f.size < 1024
+        ? `${f.size} B`
+        : f.size < 1024 * 1024
+          ? `${(f.size / 1024).toFixed(1)} KB`
+          : `${(f.size / 1024 / 1024).toFixed(1)} MB`;
+      const isMd = f.name.toLowerCase().endsWith('.md');
+      const actionHtml = isMd
+        ? `<button onclick="openMdModal('${encodeURIComponent(f.path)}', '${escHtml(f.name).replace(/'/g, "\\'")}')"
+             class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded mr-1">📖 表示</button>
+           <a href="/api/docs/${encodeURIComponent(f.path)}" download="${escHtml(f.name)}"
+              class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">↓ DL</a>`
+        : `<a href="/api/docs/${encodeURIComponent(f.path)}" download="${escHtml(f.name)}"
+              class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">↓ DL</a>`;
+      return `<tr class="border-t border-gray-700 hover:bg-gray-750">
+        <td class="px-5 py-2">
+          <span class="text-gray-200">📄 ${escHtml(f.name)}</span>
+        </td>
+        <td class="px-5 py-2 text-gray-500 text-xs">${sizeStr}</td>
+        <td class="px-5 py-2 whitespace-nowrap">${actionHtml}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="mb-6">
+      <h3 class="text-sm font-semibold text-gray-400 mb-2">${escHtml(dir)}/</h3>
+      <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-gray-400 text-xs">
+              <th class="text-left px-5 py-2">ファイル名</th>
+              <th class="text-left px-5 py-2">サイズ</th>
+              <th class="text-left px-5 py-2">操作</th>
+            </tr>
+          </thead>
+          <tbody>${filesHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+// ── Markdown Modal ────────────────────────────────────────────────────────────
+async function openMdModal(encodedPath, filename) {
+  const modal = document.getElementById('md-modal');
+  const title = document.getElementById('md-modal-title');
+  const body  = document.getElementById('md-modal-body');
+  const dlBtn = document.getElementById('md-download-btn');
+
+  title.textContent = filename;
+  body.innerHTML = '<p class="text-gray-400">読み込み中...</p>';
+  dlBtn.href = `/api/docs/${encodedPath}`;
+  dlBtn.download = filename;
+  modal.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`/api/docs/${encodedPath}/content`);
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    let html = marked.parse(data.content);
+    // Rewrite ../images/foo.png → /api/images/foo.png for in-browser display
+    html = html.replace(
+      /(<img[^>]+src=")(?:\.\.\/)*images\/([^"]+)"/g,
+      '$1/api/images/$2"'
+    );
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<p class="text-red-400">エラー: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function closeMdModal() {
+  document.getElementById('md-modal').classList.add('hidden');
+  document.getElementById('md-modal-body').innerHTML = '';
+}
+
+document.getElementById('md-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeMdModal();
+});
+
+// ── TAB 8: VPN Management ────────────────────────────────────────────────────
+let vpnUsersCache = [];
+
+async function initVpnTab() {
+  await Promise.all([refreshVpnUsers(), refreshVpnStatus()]);
+}
+
+async function refreshVpnUsers() {
+  try {
+    const res = await fetch('/api/admin/users');
+    if (!res.ok) return;
+    vpnUsersCache = await res.json();
+    renderVpnUsersTable(vpnUsersCache);
+  } catch (e) {
+    console.error('refreshVpnUsers', e);
+  }
+}
+
+async function refreshVpnStatus() {
+  const badge = document.getElementById('vpn-status-badge');
+  try {
+    const res = await fetch('/api/vpn/status');
+    if (!res.ok) {
+      badge.textContent = '⚠ VPN未設定';
+      badge.className = 'text-xs text-yellow-400';
+      document.getElementById('vpn-peers-tbody').innerHTML =
+        '<tr><td colspan="5" class="px-4 py-3 text-yellow-400 text-center">WireGuard が設定されていません</td></tr>';
+      return;
+    }
+    const data = await res.json();
+    badge.textContent = data.configured ? `✔ ${data.endpoint}` : '⚠ 未設定';
+    badge.className = data.configured ? 'text-xs text-green-400' : 'text-xs text-yellow-400';
+    renderVpnPeersTable(data.peers);
+  } catch (e) {
+    console.error('refreshVpnStatus', e);
+  }
+}
+
+function renderVpnUsersTable(users) {
+  const tbody = document.getElementById('vpn-users-tbody');
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-3 text-gray-500 text-center">ユーザーなし</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => {
+    const isAdmin = u.username === 'admin';
+    const delBtn = isAdmin
+      ? '<span class="text-xs text-gray-600">—</span>'
+      : `<button onclick="deleteVpnUser('${escHtml(u.username)}')"
+           class="text-xs text-red-400 hover:text-red-300 px-2 py-1">✕ 削除</button>`;
+    return `<tr class="border-t border-gray-700">
+      <td class="px-4 py-2 font-mono">${escHtml(u.username)}</td>
+      <td class="px-4 py-2 text-gray-400">${escHtml(u.role)}</td>
+      <td class="px-4 py-2 text-gray-300">${u.wg_peer ? escHtml(u.wg_peer) : '—'}</td>
+      <td class="px-4 py-2">${delBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderVpnPeersTable(peers) {
+  const tbody = document.getElementById('vpn-peers-tbody');
+  // Build username options from cached users (trainee/admin both can be assigned)
+  const userOpts = '<option value="">— 未割り当て —</option>' +
+    vpnUsersCache.map(u => `<option value="${escHtml(u.username)}">${escHtml(u.username)}</option>`).join('');
+
+  tbody.innerHTML = peers.map(p => {
+    const assignedLabel = p.assigned_to ? escHtml(p.assigned_to) : '—';
+    const trainingIpLabel = p.training_ip ? escHtml(p.training_ip) : '—';
+    return `<tr class="border-t border-gray-700" id="peer-row-${p.peer_id}">
+      <td class="px-4 py-2 font-mono text-xs">${escHtml(p.peer_id)}</td>
+      <td class="px-4 py-2 text-gray-300 text-xs">${escHtml(p.ip_address)}</td>
+      <td class="px-4 py-2 text-gray-300 text-xs font-mono" id="peer-tip-label-${p.peer_id}">${trainingIpLabel}</td>
+      <td class="px-4 py-2 text-gray-300 text-xs" id="peer-assigned-${p.peer_id}">${assignedLabel}</td>
+      <td class="px-4 py-2">
+        <div class="flex items-center gap-2">
+          <select id="peer-select-${p.peer_id}"
+            class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-400">
+            ${userOpts}
+          </select>
+          <input id="peer-tip-${p.peer_id}" type="text" placeholder="192.168.0.x"
+            value="${p.training_ip ? escHtml(p.training_ip) : ''}"
+            class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-28 font-mono focus:outline-none focus:border-blue-400">
+          <button onclick="assignVpnPeer('${p.peer_id}')"
+            class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded">設定</button>
+        </div>
+      </td>
+      <td class="px-4 py-2">
+        <button onclick="downloadVpnPeerConf('${p.peer_id}')"
+           class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">↓ DL</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pre-select current assignments
+  peers.forEach(p => {
+    if (p.assigned_to) {
+      const sel = document.getElementById(`peer-select-${p.peer_id}`);
+      if (sel) sel.value = p.assigned_to;
+    }
+  });
+}
+
+async function createVpnUser() {
+  const username = document.getElementById('vpn-new-username').value.trim();
+  const password = document.getElementById('vpn-new-password').value;
+  const role     = document.getElementById('vpn-new-role').value;
+  const msg      = document.getElementById('vpn-user-msg');
+
+  if (!username || !password) {
+    msg.textContent = '⚠ ユーザー名とパスワードを入力してください';
+    msg.className = 'text-xs text-yellow-400';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, role }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    msg.textContent = `✔ ${username} を作成しました`;
+    msg.className = 'text-xs text-green-400';
+    document.getElementById('vpn-new-username').value = '';
+    document.getElementById('vpn-new-password').value = '';
+    await refreshVpnUsers();
+    await refreshVpnStatus();
+  } catch (e) {
+    msg.textContent = '✖ ' + e.message;
+    msg.className = 'text-xs text-red-400';
+  }
+}
+
+async function deleteVpnUser(username) {
+  if (!confirm(`ユーザー「${username}」を削除しますか？`)) return;
+  const msg = document.getElementById('vpn-user-msg');
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 204) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText);
+    }
+    msg.textContent = `✔ ${username} を削除しました`;
+    msg.className = 'text-xs text-green-400';
+    await refreshVpnUsers();
+    await refreshVpnStatus();
+  } catch (e) {
+    msg.textContent = '✖ ' + e.message;
+    msg.className = 'text-xs text-red-400';
+  }
+}
+
+async function assignVpnPeer(peerId) {
+  const sel = document.getElementById(`peer-select-${peerId}`);
+  const tipEl = document.getElementById(`peer-tip-${peerId}`);
+  const username = sel ? sel.value : '';
+  const training_ip = tipEl ? tipEl.value.trim() : '';
+  try {
+    const res = await fetch(`/api/vpn/peers/${encodeURIComponent(peerId)}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username || null, training_ip: training_ip || null }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || res.statusText);
+    }
+    // Update the assigned and training_ip cells inline
+    const cell = document.getElementById(`peer-assigned-${peerId}`);
+    if (cell) cell.textContent = username || '—';
+    const tipLabel = document.getElementById(`peer-tip-label-${peerId}`);
+    if (tipLabel) tipLabel.textContent = training_ip || '—';
+    // Also refresh users table to reflect wg_peer change
+    await refreshVpnUsers();
+  } catch (e) {
+    alert('割り当てエラー: ' + e.message);
+  }
+}
+
+async function downloadVpnPeerConf(peerId) {
+  try {
+    const res = await fetch(`/api/vpn/peers/${encodeURIComponent(peerId)}/download`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert('ダウンロードエラー: ' + (err.detail || res.statusText));
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${peerId}.conf`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
+  } catch (e) {
+    alert('ダウンロードエラー: ' + e.message);
+  }
+}
+
+async function downloadMyVpnConfig() {
+  try {
+    const res = await fetch('/api/vpn/myconfig');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert('ダウンロードエラー: ' + (err.detail || res.statusText));
+      return;
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const nameMatch = disposition.match(/filename="([^"]+)"/);
+    const filename = nameMatch ? nameMatch[1] : 'zansin-vpn.conf';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('ダウンロードエラー: ' + e.message);
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 startClock();
-refreshSessions();
-// Poll session list every 30 s
-setInterval(refreshSessions, 30000);
+setInterval(updateElapsedTimes, 1000);
+// Check if already authenticated (session cookie exists)
+checkAuth();
 </script>
 </body>
 </html>

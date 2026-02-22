@@ -21,8 +21,8 @@ class AtkStopProcess(object):
         try:
             sub1 = subprocess.Popen(['killall', 'perl'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
             sub2 = subprocess.Popen(['killall', 'nc'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-            session = requests.Session()  
-            session.get(self.url + "/stopserver")
+            session = requests.Session()
+            session.get(self.url + "/stopserver", timeout=5)
             return True
         except requests.exceptions.RequestException as e:
             #print(e)
