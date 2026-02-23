@@ -156,18 +156,18 @@ def play_game(utility, learner_name, start_time, end_time):
             user_id, password, nick_name = utility.user_registration(session)
             if user_id is None:
                 session = None
-
-            # Execute Login.
-            utility.print_message(NOTE, f'Player "{user_id}" login.')
-            session_id = utility.user_login(session, user_id, password)
-            if session_id is not None:
-                # Create New player's instance.
-                utility.print_message(OK, f'Complete creating new player: {user_id}')
-                utility.insert_new_user(user_id, password, nick_name)
-                utility.player_id = utility.get_player_id(user_id)
-                new_player = Player(utility, session, session_id)
-                if new_player.get_user_information(save=True) is not False:
-                    player_list.append(new_player)
+            else:
+                # Execute Login.
+                utility.print_message(NOTE, f'Player "{user_id}" login.')
+                session_id = utility.user_login(session, user_id, password)
+                if session_id is not None:
+                    # Create New player's instance.
+                    utility.print_message(OK, f'Complete creating new player: {user_id}')
+                    utility.insert_new_user(user_id, password, nick_name)
+                    utility.player_id = utility.get_player_id(user_id)
+                    new_player = Player(utility, session, session_id)
+                    if new_player.get_user_information(save=True) is not False:
+                        player_list.append(new_player)
 
         # Check cheat occurred previous epoch.
         game_results = []
