@@ -192,7 +192,12 @@ def play_game(utility, learner_name, start_time, end_time):
         total_injustice_count = 0
         for player, game_result in zip(player_list, game_results):
             # Withdrawal.
-            if game_result.result() is False:
+            try:
+                result = game_result.result()
+            except Exception as e:
+                utility.print_message(FAIL, f'Player "{player.user_name}" raised an exception: {e.args}')
+                result = False
+            if result is False:
                 # Interrupt.
                 is_playing_game_disable = True
                 utility.print_message(WARNING, f'Player "{player.user_name}" interrupts the game.')

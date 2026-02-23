@@ -367,13 +367,17 @@ def atk_execution(target_host_ip, self_host_ip, self_host_port, attack_scenario_
     #===========================================================================
     # Generate files and start servers
     #===========================================================================
-    utility.generage_public_files(target, server, utility.reverseshellport)
-    atk_stop_process = AtkStopProcess(server, serverport, debug)
-    webserver = AtkWebServer(server, serverport, debug)
-    webserver.stopserver()
-    webserver.startserver()
-    #dnsserver = AtkDnsServer(debug)
-    time.sleep(5)
+    try:
+        utility.generage_public_files(target, server, utility.reverseshellport)
+        atk_stop_process = AtkStopProcess(server, serverport, debug)
+        webserver = AtkWebServer(server, serverport, debug)
+        webserver.stopserver()
+        webserver.startserver()
+        #dnsserver = AtkDnsServer(debug)
+        time.sleep(5)
+    except Exception as e:
+        utility.print_message(FAIL, f'Attack setup failed: {e.args}. Attack thread will exit.')
+        return
 
     #===========================================================================
     # Executing Scenario
