@@ -14,6 +14,7 @@ _WEB_FILES_DIR="$SCRIPT_DIR/playbook/roles/zansin-control-server/files"
 _VENV_DIR="$SCRIPT_DIR/.web_venv"
 _UVICORN="$_VENV_DIR/bin/uvicorn"
 _WORKDIR="$_WEB_FILES_DIR"
+_APT_UPDATED=0   # apt-get update を初回インストール前に一度だけ実行するフラグ
 
 # ── System dependency checks ──────────────────────────────────────────────────
 
@@ -22,6 +23,11 @@ _ensure_apt_pkg() {
     local pkg="$1"
     if dpkg -s "$pkg" &>/dev/null; then
         return 0
+    fi
+    if [ "$_APT_UPDATED" -eq 0 ]; then
+        echo "[ZANSIN] Updating package cache..."
+        sudo apt-get update -qq
+        _APT_UPDATED=1
     fi
     echo "[ZANSIN] Required package '$pkg' is not installed. Attempting to install..."
     if sudo apt-get install -y "$pkg" 2>/dev/null; then
@@ -33,11 +39,25 @@ _ensure_apt_pkg() {
     fi
 }
 
+# zansin ユーザーが存在しなければ作成して sudo グループに追加する
+_ensure_zansin_user() {
+    if id zansin &>/dev/null; then
+        return 0
+    fi
+    echo "[ZANSIN] User 'zansin' does not exist. Creating..."
+    sudo useradd -m zansin
+    sudo usermod -aG sudo zansin
+    echo "[ZANSIN] User 'zansin' created."
+    echo "[ZANSIN] NOTICE: No password was set. Run: sudo passwd zansin"
+}
+
 # start 前に必要なシステムパッケージを確認・インストール
 check_deps() {
     _ensure_apt_pkg python3-venv   # venv 作成に必須（Ubuntu 22.04 は未搭載）
     _ensure_apt_pkg lsof           # ポート競合検出に必須（Ubuntu 22.04 は未搭載）
     _ensure_apt_pkg ansible        # Setup Runner 機能に必須
+    _ensure_apt_pkg openssh-server # Requirements.md: SSH 接続に必須
+    _ensure_zansin_user            # Requirements.md: zansin ユーザーアカウントに必須
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
