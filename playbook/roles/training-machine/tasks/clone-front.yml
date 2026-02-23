@@ -1,4 +1,18 @@
 
+- name: Stop existing game containers (if any)
+  become: yes
+  become_user: vendor
+  ansible.builtin.command:
+    cmd: /usr/local/bin/docker-compose down
+    chdir: /home/vendor/game-api
+  ignore_errors: yes
+
+- name: Remove MySQL data directory to force fresh initialization
+  become: yes
+  ansible.builtin.file:
+    path: /home/vendor/game-api/.mysql_data
+    state: absent
+
 - name: Copy front files
   ansible.builtin.copy:
     src: front/
@@ -27,3 +41,14 @@
   ansible.builtin.command:
     cmd: /usr/local/bin/docker-compose up -d
     chdir: /home/vendor/game-api
+
+- name: Wait for MySQL to be ready
+  become: yes
+  become_user: vendor
+  ansible.builtin.command:
+    cmd: /usr/local/bin/docker-compose exec -T db mysqladmin ping -h localhost -u root -ppassword --silent
+    chdir: /home/vendor/game-api
+  register: mysql_ping
+  retries: 30
+  delay: 3
+  until: mysql_ping.rc == 0
