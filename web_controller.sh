@@ -69,9 +69,11 @@ _ensure_zansin_user() {
 check_deps() {
     _ensure_apt_pkg python3-venv   # venv 作成に必須（Ubuntu 22.04 は未搭載）
     _ensure_apt_pkg lsof           # ポート競合検出に必須（Ubuntu 22.04 は未搭載）
-    _ensure_apt_pkg ansible        # Setup Runner 機能に必須
-    _ensure_apt_pkg openssh-server # Requirements.md: SSH 接続に必須
-    _ensure_zansin_user            # Requirements.md: zansin ユーザーアカウントに必須
+    _ensure_apt_pkg ansible        # Setup Runner 機能に必須（zansin.sh と同等）
+    _ensure_apt_pkg sshpass        # Ansible SSH パスワード認証に必須（zansin.sh と同等）
+    _ensure_apt_pkg git            # リポジトリ操作に必須（zansin.sh と同等）
+    _ensure_apt_pkg openssh-server # SSH 接続に必須
+    _ensure_zansin_user            # zansin ユーザーアカウントに必須
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
