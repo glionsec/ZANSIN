@@ -153,7 +153,7 @@
     state: directory
     owner: zansin
     group: zansin
-    mode: "0755"
+    mode: "0775"
   become: yes
 
 - name: Create Python 3.10 virtualenv
