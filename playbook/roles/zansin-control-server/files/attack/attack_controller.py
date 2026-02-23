@@ -403,4 +403,4 @@ def atk_execution(target_host_ip, self_host_ip, self_host_port, attack_scenario_
 
     utility.print_message(NOTE, "Finish!")
 
-    sys.exit(0)
+    return
