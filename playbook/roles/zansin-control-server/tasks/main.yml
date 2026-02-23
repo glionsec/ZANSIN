@@ -62,6 +62,19 @@
   become: yes
   notify: Restart zansin-web-controller
 
+- name: Ensure runtime-writable directories have group write permission
+  ansible.builtin.file:
+    path: "/opt/zansin/red-controller/{{ item }}"
+    state: directory
+    owner: zansin
+    group: zansin
+    mode: "0775"
+  loop:
+    - attack/public
+    - attack/tools/c2s/cmd
+    - crawler/logs
+  become: yes
+
 - name: Make start_c2s.sh executable
   ansible.builtin.file:
     path: "/opt/zansin/red-controller/attack/tools/c2s/start_c2s.sh"
