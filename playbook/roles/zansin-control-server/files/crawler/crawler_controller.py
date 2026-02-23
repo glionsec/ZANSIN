@@ -62,6 +62,8 @@ def judge_cheat_users(utility, player_list):
         def count_and_document_cheat_users(response, condition=lambda d: True, message='cheat users'):
             if response is None:
                 return 0
+            if not isinstance(response, list):
+                return 0
             cheat_users = {d['nick_name'] for d in response if condition(d)}
             cheat_count = len(cheat_users)
             if cheat_count:
