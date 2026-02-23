@@ -88,6 +88,8 @@ class _SessionInfo:
         self.log_buffer: collections.deque = collections.deque(maxlen=LOG_RING_BUFFER_SIZE)
         self.sse_queues: list[asyncio.Queue] = []
         self._lock = threading.Lock()
+        # Full log file (not size-limited, unlike the ring buffer)
+        self.log_file: Path = session_dir.parent / "session.log"
 
     def _update_phase(self, line: str):
         if line == "__ZANSIN_SESSION_ENDED__":
@@ -102,6 +104,12 @@ class _SessionInfo:
         with self._lock:
             self._update_phase(line)
             self.log_buffer.append(line)
+            # Persist to file (no size limit; captures what the ring buffer may drop)
+            try:
+                with open(self.log_file, 'a', encoding='utf-8') as f:
+                    f.write(line + '\n')
+            except Exception:
+                pass
             for q in list(self.sse_queues):
                 try:
                     q.put_nowait(line)
@@ -159,6 +167,7 @@ class SessionManager:
 
         env = os.environ.copy()
         env["ZANSIN_SESSION_DIR"] = str(session_dir)
+        env["PYTHONUNBUFFERED"] = "1"
 
         duration = get_scenario_duration(scenario)
 
@@ -306,6 +315,11 @@ class SessionManager:
         if info is None:
             return None
         return info.get_log_history()
+
+    def get_log_file_path(self, session_id: str) -> Optional[Path]:
+        with self._lock:
+            info = self._sessions.get(session_id)
+        return info.log_file if info else None
 
     async def stream_logs(self, session_id: str):
         """Async generator that yields log lines for SSE."""

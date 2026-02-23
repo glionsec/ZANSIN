@@ -115,7 +115,12 @@ def atk_execution(target_host_ip, self_host_ip, self_host_port, attack_scenario_
         print("Error: %s" % e)
         sys.exit(1)
 
-    utility = Utility(target, ua, attack_scenario_num)
+    try:
+        utility = Utility(target, ua, attack_scenario_num)
+    except Exception as e:
+        print(f'[-] Attack utility initialization failed: {e.args}. Attack thread will exit.',
+              flush=True)
+        return
     if not attack_scenario_num == 0:
         ratio = 60
         
