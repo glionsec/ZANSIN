@@ -48,7 +48,21 @@ _ensure_zansin_user() {
     sudo useradd -m zansin
     sudo usermod -aG sudo zansin
     echo "[ZANSIN] User 'zansin' created."
-    echo "[ZANSIN] NOTICE: No password was set. Run: sudo passwd zansin"
+    # パスワードを対話で取得して設定（確認入力一致まで繰り返す）
+    local pw1 pw2
+    while true; do
+        read -r -s -p "[ZANSIN] Set password for 'zansin': " pw1; echo
+        read -r -s -p "[ZANSIN] Confirm password: " pw2; echo
+        if [ "$pw1" = "$pw2" ] && [ -n "$pw1" ]; then
+            break
+        elif [ -z "$pw1" ]; then
+            echo "[ZANSIN] Password cannot be empty. Please try again."
+        else
+            echo "[ZANSIN] Passwords do not match. Please try again."
+        fi
+    done
+    echo "zansin:$pw1" | sudo chpasswd
+    echo "[ZANSIN] Password set for 'zansin'."
 }
 
 # start 前に必要なシステムパッケージを確認・インストール
