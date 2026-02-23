@@ -75,6 +75,16 @@
     - crawler/logs
   become: yes
 
+- name: Ensure runtime-generated files in attack/public are group-writable
+  ansible.builtin.shell:
+    cmd: "find /opt/zansin/red-controller/attack/public -maxdepth 1 -type f -exec chmod g+w {} +"
+  become: yes
+
+- name: Ensure runtime-generated cmd files in attack/tools/c2s/cmd are group-writable
+  ansible.builtin.shell:
+    cmd: "find /opt/zansin/red-controller/attack/tools/c2s/cmd -maxdepth 1 -type f -exec chmod g+w {} + 2>/dev/null; true"
+  become: yes
+
 - name: Make start_c2s.sh executable
   ansible.builtin.file:
     path: "/opt/zansin/red-controller/attack/tools/c2s/start_c2s.sh"
