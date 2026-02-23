@@ -158,6 +158,29 @@ def log_history(session_id: str, user: dict = Depends(get_current_user)):
     return {"lines": lines}
 
 
+@app.get("/api/sessions/{session_id}/logs/download")
+def download_session_logs(session_id: str, user: dict = Depends(get_current_user)):
+    """Download the full session log as a plain-text file."""
+    log_path = manager.get_log_file_path(session_id)
+    if log_path is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    filename = f"session-{session_id[:8]}.log"
+    if log_path.exists():
+        return FileResponse(
+            path=str(log_path),
+            media_type="text/plain; charset=utf-8",
+            filename=filename,
+        )
+    # Fallback: serve the ring-buffer contents
+    lines = manager.get_log_history(session_id) or []
+    content = "\n".join(lines)
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/api/sessions/{session_id}/logs/stream")
 async def log_stream(session_id: str, user: dict = Depends(get_current_user)):
     """Server-Sent Events log stream."""

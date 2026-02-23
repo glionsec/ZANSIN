@@ -136,107 +136,122 @@ def play_game(utility, learner_name, start_time, end_time):
     # Initialize.
     player_list, epochs, now_date = [], 1, datetime.now()
 
+    # Diagnostic: confirm session duration at the start of crawling.
+    utility.print_message(OK,
+        f'Session configured: ends at {end_time.strftime(utility.get_time_format())} '
+        f'({int((end_time - start_time).total_seconds() // 60)} minutes)')
+
     # Execute crawling.
     while now_date < end_time:
         now_date = datetime.now()
-        if now_date < start_time:
-            msg = f'[Game] The start time has not come yet. now={now_date.strftime(utility.get_time_format())}, ' \
-                  f'start={start_time.strftime(utility.get_time_format())}'
-            utility.print_message(WARNING, msg)
-            time.sleep(1.0)
-            continue
+        try:
+            if now_date < start_time:
+                msg = f'[Game] The start time has not come yet. now={now_date.strftime(utility.get_time_format())}, ' \
+                      f'start={start_time.strftime(utility.get_time_format())}'
+                utility.print_message(WARNING, msg)
+                time.sleep(1.0)
+                continue
 
-        # Check users number.
-        if len(player_list) >= utility.max_player_num:
-            utility.print_message(WARNING, 'Already reached max user number.')
-            utility.print_message(WARNING, 'Could not add new player.')
-            time.sleep(1)
-        else:
-            # Execute new player's Registration.
-            utility.print_message(NOTE, 'New player\'s registration.')
-            session = utility.create_http_session()
-            user_id, password, nick_name = utility.user_registration(session)
-            if user_id is None:
-                session = None
+            # Check users number.
+            if len(player_list) >= utility.max_player_num:
+                utility.print_message(WARNING, 'Already reached max user number.')
+                utility.print_message(WARNING, 'Could not add new player.')
+                time.sleep(1)
             else:
-                # Execute Login.
-                utility.print_message(NOTE, f'Player "{user_id}" login.')
-                session_id = utility.user_login(session, user_id, password)
-                if session_id is not None:
-                    # Create New player's instance.
-                    utility.print_message(OK, f'Complete creating new player: {user_id}')
-                    utility.insert_new_user(user_id, password, nick_name)
-                    utility.player_id = utility.get_player_id(user_id)
-                    new_player = Player(utility, session, session_id)
-                    if new_player.get_user_information(save=True) is not False:
-                        player_list.append(new_player)
+                # Execute new player's Registration.
+                utility.print_message(NOTE, 'New player\'s registration.')
+                session = utility.create_http_session()
+                user_id, password, nick_name = utility.user_registration(session)
+                if user_id is None:
+                    session = None
+                else:
+                    # Execute Login.
+                    utility.print_message(NOTE, f'Player "{user_id}" login.')
+                    session_id = utility.user_login(session, user_id, password)
+                    if session_id is not None:
+                        # Create New player's instance.
+                        utility.print_message(OK, f'Complete creating new player: {user_id}')
+                        utility.insert_new_user(user_id, password, nick_name)
+                        utility.player_id = utility.get_player_id(user_id)
+                        new_player = Player(utility, session, session_id)
+                        if new_player.get_user_information(save=True) is not False:
+                            player_list.append(new_player)
 
-        # Check cheat occurred previous epoch.
-        game_results = []
-        if not utility.is_cheat_previous_epoch(learner_name, epochs - 1):
-            # Play game!!
-            utility.print_message(NOTE, f'Epoch {epochs}: Start Game!!')
-            with ThreadPoolExecutor(max_workers=utility.max_player_num, thread_name_prefix='thread') as executor:
-                for player in player_list:
-                    game_results.append(executor.submit(player.play_game))
-        else:
-            # Skip game.
-            utility.print_message(NOTE, 'Skip playing game because of cheating that occurred in the previous epoch.')
-
-        # Judge cheat users.
-        is_cheat, cheat_reason, cheat_user_count = judge_cheat_users(utility, player_list)
-
-        # End game for 1 epoch.
-        is_playing_game_disable = False
-        successful_player_list = []
-        total_injustice_count = 0
-        for player, game_result in zip(player_list, game_results):
-            # Withdrawal.
-            try:
-                result = game_result.result()
-            except Exception as e:
-                utility.print_message(FAIL, f'Player "{player.user_name}" raised an exception: {e.args}')
-                result = False
-            if result is False:
-                # Interrupt.
-                is_playing_game_disable = True
-                utility.print_message(WARNING, f'Player "{player.user_name}" interrupts the game.')
+            # Check cheat occurred previous epoch.
+            game_results = []
+            if not utility.is_cheat_previous_epoch(learner_name, epochs - 1):
+                # Play game!!
+                utility.print_message(NOTE, f'Epoch {epochs}: Start Game!!')
+                with ThreadPoolExecutor(max_workers=utility.max_player_num, thread_name_prefix='thread') as executor:
+                    for player in player_list:
+                        game_results.append(executor.submit(player.play_game))
             else:
-                # Add player who successful of game.
-                successful_player_list.append(player)
+                # Skip game.
+                utility.print_message(NOTE, 'Skip playing game because of cheating that occurred in the previous epoch.')
 
-            # Update charge amount, injustice number and so on.
-            utility.update_charge_amount(player.charge_sum, player.user_name)
-            utility.update_injustice_num(player.injustice_num, player.user_name)
-            utility.update_all(player)
+            # Judge cheat users.
+            is_cheat, cheat_reason, cheat_user_count = judge_cheat_users(utility, player_list)
 
-            # Count the total amount of injustice number in all the players.
-            if player.injustice_num > 0:
-                total_injustice_count += player.injustice_num
+            # End game for 1 epoch.
+            is_playing_game_disable = False
+            successful_player_list = []
+            total_injustice_count = 0
+            for player, game_result in zip(player_list, game_results):
+                # Withdrawal.
+                try:
+                    result = game_result.result()
+                except Exception as e:
+                    utility.print_message(FAIL, f'Player "{player.user_name}" raised an exception: {e.args}')
+                    result = False
+                if result is False:
+                    # Interrupt.
+                    is_playing_game_disable = True
+                    utility.print_message(WARNING, f'Player "{player.user_name}" interrupts the game.')
+                else:
+                    # Add player who successful of game.
+                    successful_player_list.append(player)
 
-        # Store the amount of charge and operation ratio.
-        charge_amount_per_epoch = utility.get_player_charge_in_this_epoch(epochs, successful_player_list)
-        if utility.insert_game_status_to_db(learner_name,
-                                            epochs,
-                                            is_cheat,
-                                            cheat_reason,
-                                            is_playing_game_disable,
-                                            charge_amount_per_epoch):
-            utility.print_message(OK, 'Successful stored operation ratio/charge to DB.')
-        else:
-            utility.print_message(FAIL, 'Failure store operation ratio/charge to DB.')
+                # Update charge amount, injustice number and so on.
+                try:
+                    utility.update_charge_amount(player.charge_sum, player.user_name)
+                    utility.update_injustice_num(player.injustice_num, player.user_name)
+                    utility.update_all(player)
+                except Exception as e:
+                    utility.print_message(FAIL,
+                        f'Player "{player.user_name}" post-game update failed: {e.args}. Skipping.')
 
-        # Compute loop delay time.
-        waiting_time = utility.judge_waiting_time(player_list)
-        waiting_time += utility.epoch_delay_time
+                # Count the total amount of injustice number in all the players.
+                if player.injustice_num > 0:
+                    total_injustice_count += player.injustice_num
 
-        # Waiting per epoch.
-        utility.print_message(OK, f'{waiting_time}[s] waiting.')
-        utility.print_message(NOTE, f'Epoch {epochs}: Player num={len(player_list)}, Earned charge={charge_amount_per_epoch}.')
-        utility.print_message(NOTE, f'Cheat users num={cheat_user_count}, Note={cheat_reason}')
-        utility.print_message(NOTE, f'Epoch {epochs}: {learner_name} End Game!!')
-        time.sleep(waiting_time / utility.loop_delay_rate)
-        epochs += 1
+            # Store the amount of charge and operation ratio.
+            charge_amount_per_epoch = utility.get_player_charge_in_this_epoch(epochs, successful_player_list)
+            if utility.insert_game_status_to_db(learner_name,
+                                                epochs,
+                                                is_cheat,
+                                                cheat_reason,
+                                                is_playing_game_disable,
+                                                charge_amount_per_epoch):
+                utility.print_message(OK, 'Successful stored operation ratio/charge to DB.')
+            else:
+                utility.print_message(FAIL, 'Failure store operation ratio/charge to DB.')
+
+            # Compute loop delay time.
+            waiting_time = utility.judge_waiting_time(player_list)
+            waiting_time += utility.epoch_delay_time
+
+            # Waiting per epoch.
+            utility.print_message(OK, f'{waiting_time}[s] waiting.')
+            utility.print_message(NOTE, f'Epoch {epochs}: Player num={len(player_list)}, Earned charge={charge_amount_per_epoch}.')
+            utility.print_message(NOTE, f'Cheat users num={cheat_user_count}, Note={cheat_reason}')
+            utility.print_message(NOTE, f'Epoch {epochs}: {learner_name} End Game!!')
+            time.sleep(waiting_time / utility.loop_delay_rate)
+            epochs += 1
+        except Exception as e:
+            utility.print_message(FAIL,
+                f'Epoch {epochs} raised an uncaught exception: {e.args}. Skipping to next epoch.')
+            epochs += 1
+            time.sleep(30)
 
 
 # Get judge result of crawler.
