@@ -20,3 +20,10 @@
     owner: vendor
     group: vendor
     mode: 0777
+
+- name: Start game containers
+  become: yes
+  become_user: vendor
+  ansible.builtin.command:
+    cmd: /usr/local/bin/docker-compose up -d
+    chdir: /home/vendor/game-api

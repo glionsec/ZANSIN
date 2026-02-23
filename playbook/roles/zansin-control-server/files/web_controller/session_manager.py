@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import collections
-import configparser as _cp
 import os
 import re
 import select
@@ -47,19 +46,11 @@ LOG_RING_BUFFER_SIZE = 1000
 # Duration floor for built-in scenarios
 # ---------------------------------------------------------------------------
 
-def _read_config_training_minutes() -> int:
-    """Read training_minutes from config.ini; fall back to 240 on any error."""
-    cfg = _cp.ConfigParser()
-    cfg.read(str(_HOME_RC_DIR / "config.ini"), encoding="utf-8")
-    try:
-        return int(cfg.get("Common", "training_minutes"))
-    except Exception:
-        return 240
-
-_CONFIG_TRAINING_MINUTES = _read_config_training_minutes()
-
-# Built-in scenarios whose _minutes setting must not shrink below config.ini.
-# Scenario 0 = dev, 1 = hardest, 2 = medium.
+# Minimum runtime for built-in scenarios (0=dev, 1=hardest, 2=medium).
+# Matches config.ini training_minutes=240 but is hardcoded so that a
+# misconfigured _minutes value in attack_config.ini [ScenarioMeta] cannot
+# shorten a built-in session below this floor.
+_BUILTIN_MIN_MINUTES = 240
 _BUILTIN_SCENARIOS = {0, 1, 2}
 
 # Watchdog: terminate process this many seconds after the scheduled end time.
@@ -172,16 +163,16 @@ class SessionManager:
         duration = get_scenario_duration(scenario)
 
         if scenario in _BUILTIN_SCENARIOS:
-            # For built-in scenarios, config.ini's training_minutes is the floor.
-            # This prevents a mistakenly short _minutes value from cutting the
-            # session short (e.g. "0_minutes: 5" must not override the 240-min run).
+            # For built-in scenarios, enforce the hardcoded minimum.
+            # This prevents a misconfigured _minutes (e.g. "0_minutes: 5" set
+            # via the Web UI) from cutting the session short.
             effective_duration = max(
                 duration if duration is not None else 0,
-                _CONFIG_TRAINING_MINUTES,
+                _BUILTIN_MIN_MINUTES,
             )
         else:
             # Custom scenarios: honour the explicit _minutes value as-is.
-            effective_duration = duration if duration is not None else _CONFIG_TRAINING_MINUTES
+            effective_duration = duration if duration is not None else _BUILTIN_MIN_MINUTES
 
         cmd = [
             VENV_PYTHON,
